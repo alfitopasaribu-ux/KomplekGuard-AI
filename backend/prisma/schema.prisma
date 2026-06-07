@@ -1,161 +1,214 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-
 
 enum Role {
-  PEMOHON
+  WARGA
   ADMIN
-  SUPER_ADMIN
+  SATPAM
+  KETUA_RT
 }
 
-enum ApplicationStatus {
-  DRAFT
-  SUBMITTED
-  UNDER_REVIEW
-  REVISION
-  APPROVED
-  COMPLETED
-  REJECTED
+enum AlertStatus {
+  AKTIF
+  DIPROSES
+  SELESAI
+  DIBATALKAN
 }
 
-enum DocumentType {
-  KTP
-  KK
-  AKTA_LAHIR
-  FOTO
-  SURAT_PERMOHONAN
-  OTHER
-}
-
-enum NotificationType {
-  REGISTRATION
-  APPLICATION_SUBMITTED
-  STATUS_CHANGED
-  APPLICATION_APPROVED
-  APPLICATION_COMPLETED
-  APPLICATION_REJECTED
-  REVISION_REQUIRED
-  REMINDER
+enum RiskLevel {
+  RENDAH
+  SEDANG
+  TINGGI
+  KRITIS
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String
+  id             String   @id @default(uuid())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  phone          String?
+  role           Role     @default(WARGA)
+  address        String?
+  latitude       Float?
+  longitude      Float?
+  neighborhoodId String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  neighborhood  Neighborhood?   @relation(fields: [neighborhoodId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  alerts        Alert[]
+  responses     AlertResponse[]
+  alertUpdates  AlertUpdate[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+
+  @@index([role])
+  @@index([neighborhoodId])
+}
+
+model Neighborhood {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users  User[]
+  alerts Alert[]
+}
+
+model AlertCategory {
+  id            String   @id @default(uuid())
   name          String
-  phone         String?
-  nik           String?   @unique
-  address       String?
-  role          Role      @default(PEMOHON)
-  isVerified    Boolean   @default(false)
-  isActive      Boolean   @default(true)
-  resetToken    String?
-  resetExpiry   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lastLoginAt   DateTime?
-  applications    Application[]
-  notifications   Notification[]
-  activityLogs    ActivityLog[]
+  type          String
+  icon          String?
+  color         String?
+  priorityLevel Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  @@map("users")
+  alerts Alert[]
+
+  @@unique([name, type])
 }
 
-model Application {
-  id              String            @id @default(cuid())
-  applicationNo   String            @unique
-  status          ApplicationStatus @default(SUBMITTED)
-  userId          String
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  purpose         String
-  purposeDetail   String?
-  applicantName   String
-  applicantNik     String
-  applicantDob    DateTime
-  applicantPob    String
-  applicantGender String
-  applicantAddress String
-  applicantPhone  String
-  adminNotes      String?
-  reviewedBy      String?
-  reviewedAt      DateTime?
-  completedAt     DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+model Alert {
+  id                  String       @id @default(uuid())
+  userId              String
+  categoryId          String?
+  neighborhoodId      String?
+  customCategory      String?
+  title               String
+  description         String
+  aiSummary           String?
+  aiSuggestedCategory String?
+  riskLevel           RiskLevel?
+  status              AlertStatus  @default(AKTIF)
+  latitude            Float
+  longitude           Float
+  address             String?
+  photoUrl            String?
+  isPublic            Boolean      @default(true)
+  isFalseAlarm        Boolean      @default(false)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  resolvedAt          DateTime?
 
-  documents       Document[]
-  statusHistories StatusHistory[]
-  notifications   Notification[]
+  user         User                @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  category     AlertCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  neighborhood Neighborhood?       @relation(fields: [neighborhoodId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
-  @@map("applications")
+  responses    AlertResponse[]
+  updates      AlertUpdate[]
+  aiSummaries  AIIncidentSummary[]
+  notifications Notification[]
+
+  @@index([status])
+  @@index([riskLevel])
+  @@index([userId])
+  @@index([categoryId])
+  @@index([neighborhoodId])
+  @@index([createdAt])
+  @@index([latitude, longitude])
 }
 
-model Document {
-  id              String        @id @default(cuid())
-  applicationId   String
-  application     Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  type            DocumentType
-  fileName        String
-  originalName    String
-  fileSize        Int
-  mimeType        String
-  filePath        String
-  isVerified      Boolean       @default(false)
-  verifiedAt      DateTime?
-  notes           String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+model AlertResponse {
+  id             String   @id @default(uuid())
+  alertId        String
+  userId         String
+  responseStatus String
+  note           String?
+  latitude       Float?
+  longitude      Float?
+  createdAt      DateTime @default(now())
 
-  @@map("documents")
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([alertId])
+  @@index([userId])
 }
 
-model StatusHistory {
-  id              String            @id @default(cuid())
-  applicationId   String
-  application     Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  status          ApplicationStatus
-  changedBy       String
-  changedByName   String
-  notes           String?
-  createdAt       DateTime          @default(now())
+model AlertUpdate {
+  id        String      @id @default(uuid())
+  alertId   String
+  userId    String
+  oldStatus AlertStatus
+  newStatus AlertStatus
+  note      String?
+  createdAt DateTime    @default(now())
 
-  @@map("status_histories")
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([alertId])
+  @@index([userId])
+}
+
+model EmergencyContact {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String
+  type        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AIIncidentSummary {
+  id                String    @id @default(uuid())
+  alertId           String
+  summary           String
+  recommendedAction String
+  riskLevel         RiskLevel
+  rawAiResponse     String
+  createdAt         DateTime  @default(now())
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([alertId])
 }
 
 model Notification {
-  id              String            @id @default(cuid())
-  userId          String
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  applicationId   String?
-  application     Application?      @relation(fields: [applicationId], references: [id])
-  type            NotificationType
-  title           String
-  message         String
-  isRead          Boolean           @default(false)
-  emailSent       Boolean           @default(false)
-  emailSentAt     DateTime?
-  createdAt       DateTime          @default(now())
+  id        String   @id @default(uuid())
+  userId    String
+  alertId   String?
+  title     String
+  message   String
+  type      String?  @default("ALERT")
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
 
-  @@map("notifications")
+  user  User   @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  alert Alert? @relation(fields: [alertId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([userId])
+  @@index([alertId])
+  @@index([isRead])
 }
 
 model ActivityLog {
-  id          String    @id @default(cuid())
-  userId      String?
-  user        User?     @relation(fields: [userId], references: [id])
+  id          String   @id @default(uuid())
+  userId      String
   action      String
-  description String
+  description String?
   ipAddress   String?
   userAgent   String?
-  metadata    Json?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
-  @@map("activity_logs")
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }
-
