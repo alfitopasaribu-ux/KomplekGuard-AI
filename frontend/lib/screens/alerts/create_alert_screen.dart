@@ -1,6 +1,4 @@
-import 'dart:convert';
 ﻿import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -123,8 +121,6 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
     setState(() => _loading = true);
 
     try {
-      final address = await _getAddressFromCoordinate(_lat ?? AppConstants.defaultLat, _lng ?? AppConstants.defaultLng);
-
       final res = await AlertService.createAlert({
         'title': _titleCtrl.text.trim(),
         'description': _descCtrl.text.trim(),
@@ -132,7 +128,6 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
         'customCategory': _isLainnya ? _customCtrl.text.trim() : null,
         'latitude': _lat ?? AppConstants.defaultLat,
         'longitude': _lng ?? AppConstants.defaultLng,
-      'address': address,
       });
 
       if (res['success'] == true) {
@@ -356,41 +351,6 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
         ],
       ),
     );
-  }
-
-
-  Future<String> _getAddressFromCoordinate(double lat, double lng) async {
-    try {
-      final uri = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse'
-        '?format=jsonv2'
-        '&lat=$lat'
-        '&lon=$lng'
-        '&zoom=18'
-        '&addressdetails=1',
-      );
-
-      final response = await http.get(
-        uri,
-        headers: {
-          'User-Agent': 'KomplekGuardAI/1.0',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 8));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final address = data['display_name']?.toString();
-
-        if (address != null && address.trim().isNotEmpty) {
-          return address.trim();
-        }
-      }
-
-      return 'Koordinat: $lat, $lng';
-    } catch (_) {
-      return 'Koordinat: $lat, $lng';
-    }
   }
 
 
