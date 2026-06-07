@@ -16,8 +16,20 @@ const errorMiddleware = require('./src/middleware/error.middleware');
 
 const app = express();
 
-app.use(helmet());
-app.use(cors());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+  })
+);
+
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
 app.use(morgan('dev'));
 app.use(express.json());
 

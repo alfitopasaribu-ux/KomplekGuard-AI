@@ -1,10 +1,17 @@
-class AppConstants {
+﻿class AppConstants {
+  static const String appName = 'KomplekGuard AI';
+
+  // BACKEND VERCEL URL
   static const String baseUrl = 'https://komplek-guard-ai.vercel.app/api';
 
-  static const double defaultLat = -8.650000;
-  static const double defaultLng = 115.216667;
-  static const double defaultZoom = 15.0;
+  // LOCAL STORAGE KEYS
+  static const String tokenKey = 'komplekguard_token';
+  static const String userKey = 'komplekguard_user';
 
-  static const String tokenKey = 'auth_token';
-  static const String userKey = 'user_data';
+  // DEFAULT LOCATION: DENPASAR / KOMPLEK AREA
+  static const double defaultLat = -8.6500;
+  static const double defaultLng = 115.2167;
+
+  // DEFAULT MAP ZOOM
+  static const double defaultZoom = 15.0;
 }
