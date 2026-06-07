@@ -30,7 +30,7 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Peta Alert'), backgroundColor: const Color(0xFFD32F2F), foregroundColor: Colors.white),
       body: FlutterMap(
-        options: MapOptions(
+        options: const MapOptions(
           initialCenter: LatLng(AppConstants.defaultLat, AppConstants.defaultLng),
           initialZoom: AppConstants.defaultZoom,
         ),

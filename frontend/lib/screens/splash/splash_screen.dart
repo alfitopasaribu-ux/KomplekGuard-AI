@@ -32,10 +32,10 @@ class _SplashScreenState extends State<SplashScreen> {
     // ignore: prefer_const_constructors
     return Scaffold(
       backgroundColor: const Color(0xFFD32F2F),
-      body: Center(
+      body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Icon(Icons.shield, size: 80, color: Colors.white),
             SizedBox(height: 16),
             Text('KomplekGuard AI', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),

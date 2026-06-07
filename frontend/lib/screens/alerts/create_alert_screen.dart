@@ -125,7 +125,7 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
             const Text('Kategori Alert', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _selectedCategoryId,
+              initialValue: _selectedCategoryId,
               decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'Pilih kategori'),
               items: _categories.map<DropdownMenuItem<String>>((cat) {
                 return DropdownMenuItem(value: cat['id'], child: Text('${cat['icon'] ?? ''} ${cat['name']}'));
