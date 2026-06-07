@@ -139,7 +139,7 @@ const createAlert = async (req, res) => {
         description,
         latitude: Number(latitude),
         longitude: Number(longitude),
-        address: address || user.address || null,
+        address: resolvedAddress,
         photoUrl: photoUrl || null,
         status: 'AKTIF',
       },
