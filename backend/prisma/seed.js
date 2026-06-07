@@ -43,11 +43,17 @@ async function main() {
 
   for (const cat of categories) {
     await prisma.alertCategory.upsert({
-      where: { id: cat.name },
+      where: {
+        name_type: {
+          name: cat.name,
+          type: cat.type,
+        },
+      },
       update: {},
       create: cat,
     });
   }
+
 
   // Seed admin user
   const adminPassword = await bcrypt.hash('admin123', 10);
