@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PEMOHON
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  REVISION
+  APPROVED
+  COMPLETED
+  REJECTED
+}
+
+enum DocumentType {
+  KTP
+  KK
+  AKTA_LAHIR
+  FOTO
+  SURAT_PERMOHONAN
+  OTHER
+}
+
+enum NotificationType {
+  REGISTRATION
+  APPLICATION_SUBMITTED
+  STATUS_CHANGED
+  APPLICATION_APPROVED
+  APPLICATION_COMPLETED
+  APPLICATION_REJECTED
+  REVISION_REQUIRED
+  REMINDER
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String
+  name          String
+  phone         String?
+  nik           String?        @unique
+  address       String?
+  role          Role           @default(PEMOHON)
+  isVerified    Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  resetToken    String?
+  resetExpiry   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lastLoginAt   DateTime?
+  applications  Application[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+
+  @@map("users")
+}
+
+model Application {
+  id               String            @id @default(cuid())
+  applicationNo    String            @unique
+  status           ApplicationStatus @default(SUBMITTED)
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose          String
+  purposeDetail    String?
+  applicantName    String
+  applicantNik     String
+  applicantDob     DateTime
+  applicantPob     String
+  applicantGender  String
+  applicantAddress String
+  applicantPhone   String
+  adminNotes       String?
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  documents       Document[]
+  statusHistories StatusHistory[]
+  notifications   Notification[]
+
+  @@map("applications")
+}
+
+model Document {
+  id            String       @id @default(cuid())
+  applicationId String
+  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type          DocumentType
+  fileName      String
+  originalName  String
+  fileSize      Int
+  mimeType      String
+  filePath      String
+  isVerified    Boolean      @default(false)
+  verifiedAt    DateTime?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("documents")
+}
+
+model StatusHistory {
+  id            String            @id @default(cuid())
+  applicationId String
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  status        ApplicationStatus
+  changedBy     String
+  changedByName String
+  notes         String?
+  createdAt     DateTime          @default(now())
+
+  @@map("status_histories")
+}
+
+model Notification {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application?     @relation(fields: [applicationId], references: [id])
+  type          NotificationType
+  title         String
+  message       String
+  isRead        Boolean          @default(false)
+  emailSent     Boolean          @default(false)
+  emailSentAt   DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String
+  description String
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@map("activity_logs")
+}
