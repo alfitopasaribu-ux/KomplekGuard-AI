@@ -1,8 +1,44 @@
-﻿const prisma = require('../config/database');
+const prisma = require('../config/database');
 const { sendSuccess, sendError } = require('../utils/response');
 
 function isOwner(req, alert) {
   return alert.userId === req.user.id;
+}
+
+async function reverseGeocodeAddress(latitude, longitude) {
+  try {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+
+    const url =
+      'https://nominatim.openstreetmap.org/reverse?format=jsonv2' +
+      '&lat=' + encodeURIComponent(lat) +
+      '&lon=' + encodeURIComponent(lng) +
+      '&zoom=18&addressdetails=1';
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'KomplekGuardAI/1.0',
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const displayName = data?.display_name?.toString().trim();
+
+    return displayName || null;
+  } catch (error) {
+    console.error('Reverse geocode failed:', error.message);
+    return null;
+  }
 }
 
 const alertInclude = {
@@ -129,6 +165,14 @@ const createAlert = async (req, res) => {
       return sendError(res, 'User tidak ditemukan', 404);
     }
 
+    const osmAddress = await reverseGeocodeAddress(latitude, longitude);
+
+    const finalAddress =
+      address ||
+      osmAddress ||
+      user.address ||
+      `Koordinat: ${latitude}, ${longitude}`;
+
     const alert = await prisma.alert.create({
       data: {
         userId: req.user.id,
@@ -139,7 +183,7 @@ const createAlert = async (req, res) => {
         description,
         latitude: Number(latitude),
         longitude: Number(longitude),
-        address: resolvedAddress,
+        address: finalAddress,
         photoUrl: photoUrl || null,
         status: 'AKTIF',
       },
