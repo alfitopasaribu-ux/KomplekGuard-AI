@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/theme/nexus_guard_theme.dart';
 import '../../services/safety_ai_service.dart';
