@@ -2,6 +2,7 @@
 
 import '../../core/theme/nexus_guard_theme.dart';
 import '../../services/safety_ai_service.dart';
+import '../../services/voice_service.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -18,11 +19,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
     {
       'role': 'ASSISTANT',
       'message':
-          'Halo, saya KomplekGuard AI. Kamu bisa bertanya tentang risiko lingkungan, langkah darurat, keamanan komplek, atau cara menghadapi situasi berbahaya.',
+          'Halo, saya KomplekGuard AI. Kamu bisa bertanya dengan mengetik atau menekan tombol mic untuk bicara tentang risiko lingkungan, langkah darurat, dan keamanan komplek.',
     }
   ];
 
   bool _loading = false;
+  bool _listening = false;
   String? _sessionId;
 
   @override
@@ -32,10 +34,52 @@ class _AiChatScreenState extends State<AiChatScreen> {
     super.dispose();
   }
 
+  Future<void> _toggleVoice() async {
+    try {
+      if (_listening) {
+        await VoiceService.instance.stopListening();
+        if (mounted) setState(() => _listening = false);
+        return;
+      }
+
+      setState(() => _listening = true);
+
+      await VoiceService.instance.startListening(
+        onResult: (text) {
+          if (!mounted) return;
+
+          setState(() {
+            _messageCtrl.text = text;
+            _messageCtrl.selection = TextSelection.fromPosition(
+              TextPosition(offset: _messageCtrl.text.length),
+            );
+          });
+        },
+        onDone: () {
+          if (!mounted) return;
+          setState(() => _listening = false);
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _listening = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Voice gagal: $e')),
+      );
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageCtrl.text.trim();
 
     if (text.isEmpty || _loading) return;
+
+    if (_listening) {
+      await VoiceService.instance.stopListening();
+      if (mounted) setState(() => _listening = false);
+    }
 
     setState(() {
       _messages.add({
@@ -85,11 +129,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
           'message': 'Koneksi ke AI gagal: $e',
         });
       });
-    }
-
-    if (mounted) {
-      setState(() => _loading = false);
-      _scrollToBottom();
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+        _scrollToBottom();
+      }
     }
   }
 
@@ -136,6 +180,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 _header(),
                 _quickQuestions(),
                 Expanded(child: _chatList()),
+                if (_listening) _voiceIndicator(),
                 if (_loading) _typingIndicator(),
                 _inputBox(),
               ],
@@ -150,7 +195,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
       child: NexusHudCard(
-        glowColor: NexusGuard.purple,
+        glowColor: _listening ? NexusGuard.red : NexusGuard.purple,
         active: true,
         child: Row(
           children: [
@@ -164,9 +209,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   color: NexusGuard.purple.withValues(alpha: 0.45),
                 ),
               ),
-              child: const Icon(
-                Icons.auto_awesome_rounded,
-                color: NexusGuard.purple,
+              child: Icon(
+                _listening
+                    ? Icons.graphic_eq_rounded
+                    : Icons.auto_awesome_rounded,
+                color: _listening ? NexusGuard.red : NexusGuard.purple,
               ),
             ),
             const SizedBox(width: 14),
@@ -175,7 +222,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'KOMPLEKGUARD AI ASSISTANT',
+                    'KOMPLEKGUARD VOICE AI',
                     style: NexusGuard.orbitron(
                       size: 15,
                       color: NexusGuard.purple,
@@ -184,7 +231,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Tanya AI tentang risiko, bencana, keamanan warga, atau tindakan darurat.',
+                    _listening
+                        ? 'Sedang mendengarkan suara kamu...'
+                        : 'Tanya AI dengan teks atau suara tentang keamanan lingkungan.',
                     style: NexusGuard.rajdhani(
                       size: 14,
                       color: NexusGuard.muted,
@@ -299,6 +348,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
+  Widget _voiceIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        '🎙 Mendengarkan suara...',
+        style: NexusGuard.mono(
+          color: NexusGuard.red,
+          size: 12,
+        ),
+      ),
+    );
+  }
+
   Widget _typingIndicator() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -338,7 +400,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 ),
                 onSubmitted: (_) => _sendMessage(),
                 decoration: InputDecoration(
-                  hintText: 'Tanya AI tentang keamanan komplek...',
+                  hintText: _listening
+                      ? 'Suara kamu sedang ditulis otomatis...'
+                      : 'Tanya AI tentang keamanan komplek...',
                   hintStyle: NexusGuard.rajdhani(
                     color: NexusGuard.muted2,
                   ),
@@ -360,6 +424,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       color: NexusGuard.cyan,
                     ),
                   ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              height: 52,
+              width: 52,
+              child: ElevatedButton(
+                onPressed: _toggleVoice,
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  backgroundColor:
+                      _listening ? NexusGuard.red : NexusGuard.purple,
+                  foregroundColor: NexusGuard.bg,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: Icon(
+                  _listening ? Icons.stop_rounded : Icons.mic_rounded,
                 ),
               ),
             ),
