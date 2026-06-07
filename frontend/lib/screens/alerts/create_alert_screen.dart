@@ -5,6 +5,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/nexus_guard_theme.dart';
 import '../../services/ai_service.dart';
 import '../../services/alert_service.dart';
+import '../../services/safety_ai_service.dart';
+import '../../services/voice_service.dart';
 import '../../services/api_service.dart';
 
 class CreateAlertScreen extends StatefulWidget {
@@ -28,6 +30,8 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
   double? _lng;
 
   bool _loading = false;
+  bool _voiceListening = false;
+  bool _aiDraftLoading = false;
   bool _gettingLocation = false;
 
   @override
@@ -163,6 +167,193 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
     );
   }
 
+  Future<void> _toggleVoiceDescription() async {
+    try {
+      if (_voiceListening) {
+        await VoiceService.instance.stopListening();
+        if (mounted) setState(() => _voiceListening = false);
+        return;
+      }
+
+      setState(() => _voiceListening = true);
+
+      await VoiceService.instance.startListening(
+        onResult: (text) {
+          if (!mounted) return;
+
+          setState(() {
+            _descCtrl.text = text;
+            _descCtrl.selection = TextSelection.fromPosition(
+              TextPosition(offset: _descCtrl.text.length),
+            );
+          });
+        },
+        onDone: () {
+          if (!mounted) return;
+          setState(() => _voiceListening = false);
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _voiceListening = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Voice gagal: $e')),
+      );
+    }
+  }
+
+  Future<void> _generateAiDraftFromVoice() async {
+    final transcript = _descCtrl.text.trim();
+
+    if (transcript.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ceritakan kejadian dengan suara dulu')),
+      );
+      return;
+    }
+
+    try {
+      setState(() => _aiDraftLoading = true);
+
+      final res = await SafetyAiService.createVoiceAlertDraft(
+        transcript: transcript,
+      );
+
+      if (!mounted) return;
+
+      if (res['success'] == true) {
+        final data = res['data'];
+
+        if (data['title'] != null) {
+          _titleCtrl.text = data['title'].toString();
+        }
+
+        if (data['description'] != null) {
+          _descCtrl.text = data['description'].toString();
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              data['panicReductionMessage']?.toString() ??
+                  'AI berhasil merapikan laporan suara.',
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res['message']?.toString() ?? 'AI gagal')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('AI draft gagal: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _aiDraftLoading = false);
+    }
+  }
+
+  Widget _voiceAlertPanel() {
+    return NexusHudCard(
+      glowColor: _voiceListening ? NexusGuard.red : NexusGuard.purple,
+      active: _voiceListening,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _voiceListening
+                    ? Icons.graphic_eq_rounded
+                    : Icons.mic_rounded,
+                color: _voiceListening ? NexusGuard.red : NexusGuard.purple,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _voiceListening
+                      ? 'VOICE INPUT AKTIF — ceritakan kejadian sekarang'
+                      : 'VOICE INPUT — gunakan suara jika sulit mengetik kejadian',
+                  style: NexusGuard.mono(
+                    color: _voiceListening ? NexusGuard.red : NexusGuard.purple,
+                    size: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _toggleVoiceDescription,
+                  icon: Icon(
+                    _voiceListening ? Icons.stop_rounded : Icons.mic_rounded,
+                  ),
+                  label: Text(
+                    _voiceListening ? 'STOP SUARA' : 'CERITAKAN DENGAN SUARA',
+                    style: NexusGuard.mono(
+                      color: NexusGuard.bg,
+                      size: 11,
+                      weight: FontWeight.w800,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        _voiceListening ? NexusGuard.red : NexusGuard.cyan,
+                    foregroundColor: NexusGuard.bg,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _aiDraftLoading ? null : _generateAiDraftFromVoice,
+                  icon: _aiDraftLoading
+                      ? const SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.auto_awesome_rounded),
+                  label: Text(
+                    _aiDraftLoading ? 'AI MEMPROSES...' : 'RAPIKAN DENGAN AI',
+                    style: NexusGuard.mono(
+                      color: NexusGuard.bg,
+                      size: 11,
+                      weight: FontWeight.w800,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NexusGuard.purple,
+                    foregroundColor: NexusGuard.bg,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -214,7 +405,9 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
                   const SizedBox(height: 14),
                   _formPanel(),
                   const SizedBox(height: 18),
-                  NexusPrimaryButton(
+                  _voiceAlertPanel(),
+                          const SizedBox(height: 16),
+                          NexusPrimaryButton(
                     text: _loading ? 'MENGIRIM ALERT...' : 'KIRIM ALERT DARURAT',
                     icon: Icons.send_rounded,
                     color: NexusGuard.red,
