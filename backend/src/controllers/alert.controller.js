@@ -1,24 +1,8 @@
-const { PrismaClient } = require("@prisma/client");
+﻿const prisma = require('../config/database');
+const { sendSuccess, sendError } = require('../utils/response');
 
-const prisma = new PrismaClient();
-
-function getUserId(req) {
-  return req.user?.id || req.user?.userId || req.userId;
-}
-
-function success(res, message, data = null) {
-  return res.json({
-    success: true,
-    message,
-    data,
-  });
-}
-
-function failed(res, message, status = 500) {
-  return res.status(status).json({
-    success: false,
-    message,
-  });
+function isOwner(req, alert) {
+  return alert.userId === req.user.id;
 }
 
 const alertInclude = {
@@ -36,14 +20,9 @@ const alertInclude = {
   },
   category: true,
   neighborhood: true,
-  aiSummaries: {
-    orderBy: {
-      createdAt: "desc",
-    },
-  },
   responses: {
     orderBy: {
-      createdAt: "desc",
+      createdAt: 'desc',
     },
     include: {
       user: {
@@ -57,16 +36,70 @@ const alertInclude = {
       },
     },
   },
+  aiSummaries: {
+    orderBy: {
+      createdAt: 'desc',
+    },
+  },
 };
 
-exports.createAlert = async (req, res) => {
+const getAlerts = async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const alerts = await prisma.alert.findMany({
+      include: alertInclude,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
-    if (!userId) {
-      return failed(res, "User tidak valid. Silakan login ulang.", 401);
-    }
+    return sendSuccess(res, 'Daftar alert', alerts);
+  } catch (e) {
+    return sendError(res, e.message, 500);
+  }
+};
 
+const getActiveAlerts = async (req, res) => {
+  try {
+    const alerts = await prisma.alert.findMany({
+      where: {
+        status: {
+          in: ['AKTIF', 'DIPROSES'],
+        },
+      },
+      include: alertInclude,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return sendSuccess(res, 'Alert aktif', alerts);
+  } catch (e) {
+    return sendError(res, e.message, 500);
+  }
+};
+
+const getAlertHistory = async (req, res) => {
+  try {
+    const alerts = await prisma.alert.findMany({
+      where: {
+        status: {
+          in: ['SELESAI', 'DIBATALKAN'],
+        },
+      },
+      include: alertInclude,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return sendSuccess(res, 'Riwayat alert', alerts);
+  } catch (e) {
+    return sendError(res, e.message, 500);
+  }
+};
+
+const createAlert = async (req, res) => {
+  try {
     const {
       categoryId,
       customCategory,
@@ -79,44 +112,26 @@ exports.createAlert = async (req, res) => {
     } = req.body;
 
     if (!title || !description || latitude == null || longitude == null) {
-      return failed(
+      return sendError(
         res,
-        "Judul, deskripsi, latitude, dan longitude wajib diisi.",
+        'Judul, deskripsi, latitude, dan longitude wajib diisi',
         400
       );
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: {
+        id: req.user.id,
+      },
     });
 
     if (!user) {
-      return failed(res, "User tidak ditemukan.", 404);
-    }
-
-    let category = null;
-
-    if (categoryId) {
-      category = await prisma.alertCategory.findUnique({
-        where: { id: categoryId },
-      });
-
-      if (!category) {
-        return failed(res, "Kategori alert tidak ditemukan.", 404);
-      }
-
-      if (category.name === "Lainnya" && !customCategory) {
-        return failed(
-          res,
-          "Jenis alert lainnya wajib diisi jika memilih kategori Lainnya.",
-          400
-        );
-      }
+      return sendError(res, 'User tidak ditemukan', 404);
     }
 
     const alert = await prisma.alert.create({
       data: {
-        userId,
+        userId: req.user.id,
         categoryId: categoryId || null,
         neighborhoodId: user.neighborhoodId || null,
         customCategory: customCategory || null,
@@ -126,125 +141,80 @@ exports.createAlert = async (req, res) => {
         longitude: Number(longitude),
         address: address || user.address || null,
         photoUrl: photoUrl || null,
-        status: "AKTIF",
+        status: 'AKTIF',
       },
       include: alertInclude,
     });
 
     await prisma.activityLog.create({
       data: {
-        userId,
-        action: "CREATE_ALERT",
+        userId: req.user.id,
+        action: 'CREATE_ALERT',
         description: `Membuat alert: ${title}`,
       },
     });
 
-    return success(res, "Alert berhasil dibuat.", alert);
-  } catch (error) {
-    return failed(res, error.message);
+    return sendSuccess(res, 'Alert berhasil dibuat', alert, 201);
+  } catch (e) {
+    return sendError(res, e.message, 500);
   }
 };
 
-exports.getAlerts = async (req, res) => {
+const getAlertById = async (req, res) => {
   try {
-    const alerts = await prisma.alert.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-      include: alertInclude,
-    });
-
-    return success(res, "Daftar alert berhasil diambil.", alerts);
-  } catch (error) {
-    return failed(res, error.message);
-  }
-};
-
-exports.getActiveAlerts = async (req, res) => {
-  try {
-    const alerts = await prisma.alert.findMany({
-      where: {
-        status: {
-          in: ["AKTIF", "DIPROSES"],
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      include: alertInclude,
-    });
-
-    return success(res, "Daftar alert aktif berhasil diambil.", alerts);
-  } catch (error) {
-    return failed(res, error.message);
-  }
-};
-
-exports.getAlertHistory = async (req, res) => {
-  try {
-    const alerts = await prisma.alert.findMany({
-      where: {
-        status: {
-          in: ["SELESAI", "DIBATALKAN"],
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      include: alertInclude,
-    });
-
-    return success(res, "Riwayat alert berhasil diambil.", alerts);
-  } catch (error) {
-    return failed(res, error.message);
-  }
-};
-
-exports.getAlertById = async (req, res) => {
-  try {
-    const { id } = req.params;
-
     const alert = await prisma.alert.findUnique({
-      where: { id },
+      where: {
+        id: req.params.id,
+      },
       include: alertInclude,
     });
 
     if (!alert) {
-      return failed(res, "Alert tidak ditemukan.", 404);
+      return sendError(res, 'Alert tidak ditemukan', 404);
     }
 
-    return success(res, "Detail alert berhasil diambil.", alert);
-  } catch (error) {
-    return failed(res, error.message);
+    return sendSuccess(res, 'Detail alert', alert);
+  } catch (e) {
+    return sendError(res, e.message, 500);
   }
 };
 
-exports.updateAlertStatus = async (req, res) => {
+const updateAlertStatus = async (req, res) => {
   try {
-    const userId = getUserId(req);
-    const { id } = req.params;
     const { status, note } = req.body;
 
-    const allowedStatus = ["AKTIF", "DIPROSES", "SELESAI", "DIBATALKAN"];
+    const allowedStatus = ['AKTIF', 'DIPROSES', 'SELESAI', 'DIBATALKAN'];
 
     if (!allowedStatus.includes(status)) {
-      return failed(res, "Status alert tidak valid.", 400);
+      return sendError(res, 'Status alert tidak valid', 400);
     }
 
-    const oldAlert = await prisma.alert.findUnique({
-      where: { id },
+    const alert = await prisma.alert.findUnique({
+      where: {
+        id: req.params.id,
+      },
     });
 
-    if (!oldAlert) {
-      return failed(res, "Alert tidak ditemukan.", 404);
+    if (!alert) {
+      return sendError(res, 'Alert tidak ditemukan', 404);
     }
 
-    const alert = await prisma.alert.update({
-      where: { id },
+    if (!isOwner(req, alert)) {
+      return sendError(
+        res,
+        'Akses ditolak. Hanya pelapor yang dapat mengubah status alert ini.',
+        403
+      );
+    }
+
+    const updated = await prisma.alert.update({
+      where: {
+        id: req.params.id,
+      },
       data: {
         status,
         resolvedAt:
-          status === "SELESAI" || status === "DIBATALKAN"
+          status === 'SELESAI' || status === 'DIBATALKAN'
             ? new Date()
             : null,
       },
@@ -253,9 +223,9 @@ exports.updateAlertStatus = async (req, res) => {
 
     await prisma.alertUpdate.create({
       data: {
-        alertId: id,
-        userId,
-        oldStatus: oldAlert.status,
+        alertId: alert.id,
+        userId: req.user.id,
+        oldStatus: alert.status,
         newStatus: status,
         note: note || null,
       },
@@ -263,28 +233,90 @@ exports.updateAlertStatus = async (req, res) => {
 
     await prisma.activityLog.create({
       data: {
-        userId,
-        action: "UPDATE_ALERT_STATUS",
-        description: `Mengubah status alert dari ${oldAlert.status} menjadi ${status}`,
+        userId: req.user.id,
+        action: 'UPDATE_ALERT_STATUS',
+        description: `Mengubah status alert "${alert.title}" dari ${alert.status} menjadi ${status}`,
       },
     });
 
-    return success(res, "Status alert berhasil diperbarui.", alert);
-  } catch (error) {
-    return failed(res, error.message);
+    return sendSuccess(res, 'Status alert berhasil diperbarui', updated);
+  } catch (e) {
+    return sendError(res, e.message, 500);
   }
 };
 
-exports.deleteAlert = async (req, res) => {
+const deleteAlert = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    await prisma.alert.delete({
-      where: { id },
+    const alert = await prisma.alert.findUnique({
+      where: {
+        id: req.params.id,
+      },
     });
 
-    return success(res, "Alert berhasil dihapus.");
-  } catch (error) {
-    return failed(res, error.message);
+    if (!alert) {
+      return sendError(res, 'Alert tidak ditemukan', 404);
+    }
+
+    if (!isOwner(req, alert)) {
+      return sendError(
+        res,
+        'Akses ditolak. Hanya pelapor yang dapat menghapus alert ini.',
+        403
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.notification.deleteMany({
+        where: {
+          alertId: alert.id,
+        },
+      });
+
+      await tx.alertResponse.deleteMany({
+        where: {
+          alertId: alert.id,
+        },
+      });
+
+      await tx.alertUpdate.deleteMany({
+        where: {
+          alertId: alert.id,
+        },
+      });
+
+      await tx.aIIncidentSummary.deleteMany({
+        where: {
+          alertId: alert.id,
+        },
+      });
+
+      await tx.alert.delete({
+        where: {
+          id: alert.id,
+        },
+      });
+
+      await tx.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'DELETE_ALERT',
+          description: `Menghapus alert: ${alert.title}`,
+        },
+      });
+    });
+
+    return sendSuccess(res, 'Alert berhasil dihapus');
+  } catch (e) {
+    return sendError(res, e.message, 500);
   }
+};
+
+module.exports = {
+  getAlerts,
+  getActiveAlerts,
+  getAlertHistory,
+  createAlert,
+  getAlertById,
+  updateAlertStatus,
+  deleteAlert,
 };

@@ -1,6 +1,10 @@
-import 'api_service.dart';
+﻿import 'api_service.dart';
 
 class AlertService {
+  static Future<Map<String, dynamic>> getAlerts() async {
+    return await ApiService.get('/alerts');
+  }
+
   static Future<Map<String, dynamic>> getActiveAlerts() async {
     return await ApiService.get('/alerts/active');
   }
@@ -17,11 +21,29 @@ class AlertService {
     return await ApiService.get('/alerts/$id');
   }
 
-  static Future<Map<String, dynamic>> respondToAlert(String id, String responseStatus, {String? note}) async {
-    return await ApiService.post('/alerts/$id/respond', {'responseStatus': responseStatus, 'note': note});
+  static Future<Map<String, dynamic>> respondToAlert(
+    String id,
+    String responseStatus, {
+    String? note,
+  }) async {
+    return await ApiService.post('/alerts/$id/respond', {
+      'responseStatus': responseStatus,
+      'note': note,
+    });
   }
 
-  static Future<Map<String, dynamic>> updateStatus(String id, String status) async {
-    return await ApiService.put('/alerts/$id/status', {'status': status});
+  static Future<Map<String, dynamic>> updateStatus(
+    String id,
+    String status, {
+    String? note,
+  }) async {
+    return await ApiService.put('/alerts/$id/status', {
+      'status': status,
+      'note': note,
+    });
+  }
+
+  static Future<Map<String, dynamic>> deleteAlert(String id) async {
+    return await ApiService.delete('/alerts/$id');
   }
 }
