@@ -295,6 +295,7 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
 
   Widget _categoryDropdown() {
     return DropdownButtonFormField<String>(
+      // ignore: deprecated_member_use
       value: _selectedCategoryId,
       dropdownColor: NexusGuard.panel,
       iconEnabledColor: NexusGuard.cyan,

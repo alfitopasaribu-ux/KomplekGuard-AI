@@ -7,6 +7,254 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id              String            @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name            String
+  email           String            @unique
+  passwordHash    String
+  phone           String?
+  role            Role              @default(WARGA)
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @default(now()) @updatedAt
+  neighborhoodId  String?
+  activityLogs    ActivityLog[]
+  AiChatMessage   AiChatMessage[]
+  AiChatSession   AiChatSession[]
+  alerts          Alert[]
+  responses       AlertResponse[]
+  alertUpdates    AlertUpdate[]
+  notifications   Notification[]
+  neighborhood    Neighborhood?     @relation(fields: [neighborhoodId], references: [id])
+  VoiceAlertDraft VoiceAlertDraft[]
+
+  @@index([role])
+  @@index([neighborhoodId])
+}
+
+model Neighborhood {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name      String
+  address   String?
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  alerts    Alert[]
+  users     User[]
+}
+
+model AlertCategory {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name          String
+  type          String
+  icon          String?
+  color         String?
+  priorityLevel Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+  alerts        Alert[]
+
+  @@unique([name, type], map: "AlertCategory_name_type_unique")
+}
+
+model Alert {
+  id                  String              @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId              String
+  categoryId          String?
+  customCategory      String?
+  title               String
+  description         String
+  aiSummary           String?
+  riskLevel           RiskLevel?
+  status              AlertStatus         @default(AKTIF)
+  latitude            Float
+  longitude           Float
+  address             String?
+  photoUrl            String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @default(now()) @updatedAt
+  resolvedAt          DateTime?
+  neighborhoodId      String?
+  aiSuggestedCategory String?
+  isPublic            Boolean             @default(true)
+  isFalseAlarm        Boolean             @default(false)
+  aiSummaries         AIIncidentSummary[]
+  category            AlertCategory?      @relation(fields: [categoryId], references: [id])
+  neighborhood        Neighborhood?       @relation(fields: [neighborhoodId], references: [id])
+  user                User                @relation(fields: [userId], references: [id])
+  responses           AlertResponse[]
+  updates             AlertUpdate[]
+  notifications       Notification[]
+  VoiceAlertDraft     VoiceAlertDraft[]
+
+  @@index([status])
+  @@index([riskLevel])
+  @@index([userId])
+  @@index([categoryId])
+  @@index([neighborhoodId])
+  @@index([createdAt])
+  @@index([latitude, longitude], map: "Alert_location_idx")
+}
+
+model AlertResponse {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  alertId        String
+  userId         String
+  responseStatus String
+  note           String?
+  latitude       Float?
+  longitude      Float?
+  createdAt      DateTime @default(now())
+  alert          Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@index([alertId])
+  @@index([userId])
+}
+
+model AlertUpdate {
+  id        String      @id @default(dbgenerated("(gen_random_uuid())::text"))
+  alertId   String
+  userId    String
+  oldStatus AlertStatus
+  newStatus AlertStatus
+  note      String?
+  createdAt DateTime    @default(now())
+  alert     Alert       @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id])
+
+  @@index([alertId])
+}
+
+model EmergencyContact {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name        String
+  phone       String
+  type        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+model AIIncidentSummary {
+  id                String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  alertId           String
+  summary           String
+  recommendedAction String
+  riskLevel         RiskLevel
+  rawAiResponse     String
+  createdAt         DateTime  @default(now())
+  alert             Alert     @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([alertId])
+}
+
+model Notification {
+  id        String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId    String
+  alertId   String?
+  title     String
+  message   String
+  isRead    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  type      String?   @default("ALERT")
+  readAt    DateTime?
+  alert     Alert?    @relation(fields: [alertId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model ActivityLog {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId      String
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
+  ipAddress   String?
+  userAgent   String?
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AiChatMessage {
+  id            String        @id @default(dbgenerated("(gen_random_uuid())::text"))
+  sessionId     String
+  userId        String
+  role          String
+  message       String
+  riskLevel     RiskLevel?
+  intent        String?
+  rawAiResponse String?
+  createdAt     DateTime      @default(now())
+  AiChatSession AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  User          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([sessionId])
+  @@index([userId])
+}
+
+model AiChatSession {
+  id            String          @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId        String
+  title         String          @default("Percakapan KomplekGuard AI")
+  topic         String?
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now())
+  AiChatMessage AiChatMessage[]
+  User          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model DailySafetyBriefing {
+  id               String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  date             DateTime  @unique @default(dbgenerated("CURRENT_DATE")) @db.Date
+  summary          String
+  riskLevel        RiskLevel @default(RENDAH)
+  recommendation   String
+  activeAlertCount Int       @default(0)
+  totalAlertToday  Int       @default(0)
+  totalAlertWeek   Int       @default(0)
+  topCategory      String?
+  dangerArea       String?
+  rawAiResponse    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now())
+
+  @@index([createdAt])
+}
+
+model VoiceAlertDraft {
+  id                    String     @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId                String
+  transcript            String
+  title                 String?
+  description           String?
+  categorySuggestion    String?
+  riskLevel             RiskLevel?
+  recommendedAction     String?
+  panicReductionMessage String?
+  rawAiResponse         String?
+  isConvertedToAlert    Boolean    @default(false)
+  alertId               String?
+  createdAt             DateTime   @default(now())
+  Alert                 Alert?     @relation(fields: [alertId], references: [id])
+  User                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([alertId])
+  @@index([userId])
+}
+
 enum Role {
   WARGA
   ADMIN
@@ -26,189 +274,4 @@ enum RiskLevel {
   SEDANG
   TINGGI
   KRITIS
-}
-
-model User {
-  id             String   @id @default(uuid())
-  name           String
-  email          String   @unique
-  passwordHash   String
-  phone          String?
-  role           Role     @default(WARGA)
-  address        String?
-  latitude       Float?
-  longitude      Float?
-  neighborhoodId String?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  neighborhood  Neighborhood?   @relation(fields: [neighborhoodId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  alerts        Alert[]
-  responses     AlertResponse[]
-  alertUpdates  AlertUpdate[]
-  notifications Notification[]
-  activityLogs  ActivityLog[]
-
-  @@index([role])
-  @@index([neighborhoodId])
-}
-
-model Neighborhood {
-  id        String   @id @default(uuid())
-  name      String
-  address   String?
-  latitude  Float?
-  longitude Float?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  users  User[]
-  alerts Alert[]
-}
-
-model AlertCategory {
-  id            String   @id @default(uuid())
-  name          String
-  type          String
-  icon          String?
-  color         String?
-  priorityLevel Int      @default(1)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  alerts Alert[]
-
-  @@unique([name, type])
-}
-
-model Alert {
-  id                  String       @id @default(uuid())
-  userId              String
-  categoryId          String?
-  neighborhoodId      String?
-  customCategory      String?
-  title               String
-  description         String
-  aiSummary           String?
-  aiSuggestedCategory String?
-  riskLevel           RiskLevel?
-  status              AlertStatus  @default(AKTIF)
-  latitude            Float
-  longitude           Float
-  address             String?
-  photoUrl            String?
-  isPublic            Boolean      @default(true)
-  isFalseAlarm        Boolean      @default(false)
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-  resolvedAt          DateTime?
-
-  user         User                @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  category     AlertCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  neighborhood Neighborhood?       @relation(fields: [neighborhoodId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-
-  responses    AlertResponse[]
-  updates      AlertUpdate[]
-  aiSummaries  AIIncidentSummary[]
-  notifications Notification[]
-
-  @@index([status])
-  @@index([riskLevel])
-  @@index([userId])
-  @@index([categoryId])
-  @@index([neighborhoodId])
-  @@index([createdAt])
-  @@index([latitude, longitude])
-}
-
-model AlertResponse {
-  id             String   @id @default(uuid())
-  alertId        String
-  userId         String
-  responseStatus String
-  note           String?
-  latitude       Float?
-  longitude      Float?
-  createdAt      DateTime @default(now())
-
-  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-
-  @@index([alertId])
-  @@index([userId])
-}
-
-model AlertUpdate {
-  id        String      @id @default(uuid())
-  alertId   String
-  userId    String
-  oldStatus AlertStatus
-  newStatus AlertStatus
-  note      String?
-  createdAt DateTime    @default(now())
-
-  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-
-  @@index([alertId])
-  @@index([userId])
-}
-
-model EmergencyContact {
-  id          String   @id @default(uuid())
-  name        String
-  phone       String
-  type        String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model AIIncidentSummary {
-  id                String    @id @default(uuid())
-  alertId           String
-  summary           String
-  recommendedAction String
-  riskLevel         RiskLevel
-  rawAiResponse     String
-  createdAt         DateTime  @default(now())
-
-  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  @@index([alertId])
-}
-
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  alertId   String?
-  title     String
-  message   String
-  type      String?  @default("ALERT")
-  isRead    Boolean  @default(false)
-  readAt    DateTime?
-  createdAt DateTime @default(now())
-
-  user  User   @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  alert Alert? @relation(fields: [alertId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-
-  @@index([userId])
-  @@index([alertId])
-  @@index([isRead])
-}
-
-model ActivityLog {
-  id          String   @id @default(uuid())
-  userId      String
-  action      String
-  description String?
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-
-  @@index([userId])
-  @@index([createdAt])
 }
