@@ -26,13 +26,12 @@ app.use(
 
 app.use(
   cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    origin: true,
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
-
-app.options('*', cors());
 
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
@@ -42,6 +41,14 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'KomplekGuard AI API is running',
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Backend healthy',
+    timestamp: new Date().toISOString(),
   });
 });
 
