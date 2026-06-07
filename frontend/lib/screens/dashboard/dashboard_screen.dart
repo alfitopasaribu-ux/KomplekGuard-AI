@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/nexus_guard_theme.dart';
 import '../../services/alert_service.dart';
 import '../../services/auth_service.dart';
+import '../ai/ai_chat_screen.dart';
 import '../alerts/alert_detail_screen.dart';
 import '../alerts/alert_list_screen.dart';
 import '../alerts/create_alert_screen.dart';
@@ -118,6 +119,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  void _openAiChat() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AiChatScreen()),
+    );
+  }
+
   void _openAlertList() {
     Navigator.push(
       context,
@@ -209,6 +217,14 @@ class _DashboardScreenState extends State<DashboardScreen>
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'AI Safety Chat',
+            onPressed: _openAiChat,
+            icon: const Icon(
+              Icons.smart_toy_rounded,
+              color: NexusGuard.purple,
+            ),
+          ),
           IconButton(
             tooltip: 'Tactical Map',
             onPressed: _openMap,
@@ -491,46 +507,79 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _aiPanel() {
     return NexusHudCard(
       glowColor: NexusGuard.purple,
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: NexusGuard.purple.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: NexusGuard.purple.withValues(alpha: 0.25),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: NexusGuard.purple.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: NexusGuard.purple.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: NexusGuard.purple,
+                  size: 30,
+                ),
               ),
-            ),
-            child: const Icon(
-              Icons.auto_awesome_rounded,
-              color: NexusGuard.purple,
-              size: 30,
-            ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI EMERGENCY ASSISTANT',
+                      style: NexusGuard.orbitron(
+                        size: 16,
+                        color: NexusGuard.purple,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'AI menganalisis laporan warga, menentukan risk level, membuat panduan tindakan awal, dan bisa diajak ngobrol tentang risiko keamanan lingkungan.',
+                      style: NexusGuard.rajdhani(
+                        size: 15,
+                        color: NexusGuard.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'AI EMERGENCY ASSISTANT',
-                  style: NexusGuard.orbitron(
-                    size: 16,
-                    color: NexusGuard.purple,
-                  ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _openAiChat,
+              icon: const Icon(Icons.smart_toy_rounded),
+              label: Text(
+                'BUKA AI SAFETY CHAT',
+                style: NexusGuard.mono(
+                  color: NexusGuard.bg,
+                  size: 13,
+                  weight: FontWeight.w800,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'AI menganalisis laporan warga, menentukan risk level, dan membuat panduan tindakan awal agar pelapor tidak panik.',
-                  style: NexusGuard.rajdhani(
-                    size: 15,
-                    color: NexusGuard.muted,
-                  ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: NexusGuard.purple,
+                foregroundColor: NexusGuard.bg,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 15,
                 ),
-              ],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
             ),
           ),
         ],
