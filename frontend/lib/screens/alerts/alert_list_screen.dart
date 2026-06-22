@@ -107,7 +107,7 @@ class _AlertListScreenState extends State<AlertListScreen>
               },
               leading: const Icon(
                 Icons.warning_rounded,
-                color: Color(0xFFD32F2F),
+                color: Color(0xFF00E5FF),
               ),
               title: Text(alert['title']?.toString() ?? ''),
               subtitle: Text(
@@ -134,7 +134,7 @@ class _AlertListScreenState extends State<AlertListScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Daftar Alert'),
-        backgroundColor: const Color(0xFFD32F2F),
+        backgroundColor: const Color(0xFF081021),
         foregroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabController,
