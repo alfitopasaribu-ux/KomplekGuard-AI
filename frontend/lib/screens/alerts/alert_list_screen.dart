@@ -138,9 +138,10 @@ class _AlertListScreenState extends State<AlertListScreen>
         backgroundColor: const Color(0xFF081021),
         foregroundColor: NexusGuard.text,
         bottom: TabBar(
+          unselectedLabelColor: NexusGuard.muted,
           controller: _tabController,
-          labelColor: Colors.white,
-          indicatorColor: Colors.white,
+          labelColor: NexusGuard.cyan,
+          indicatorColor: NexusGuard.cyan,
           tabs: const [
             Tab(text: 'Aktif'),
             Tab(text: 'Riwayat'),
@@ -159,5 +160,6 @@ class _AlertListScreenState extends State<AlertListScreen>
     );
   }
 }
+
 
 
