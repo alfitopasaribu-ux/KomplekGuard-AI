@@ -34,6 +34,8 @@ class VoiceService {
     }
 
     await _speech.listen(
+      // ignore: deprecated_member_use
+      localeId: 'id-ID',
       onResult: (SpeechRecognitionResult result) {
         onResult(result.recognizedWords);
 
@@ -42,7 +44,7 @@ class VoiceService {
         }
       },
      listenOptions: SpeechListenOptions(
-  localeId: 'id_ID',
+  
   listenMode: ListenMode.dictation,
   partialResults: false,
   listenFor: const Duration(seconds: 60),
@@ -63,3 +65,4 @@ class VoiceService {
     }
   }
 }
+
