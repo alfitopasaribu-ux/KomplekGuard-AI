@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/nexus_guard_theme.dart';
 
 import '../../services/alert_service.dart';
 import 'alert_detail_screen.dart';
@@ -135,7 +136,7 @@ class _AlertListScreenState extends State<AlertListScreen>
       appBar: AppBar(
         title: const Text('Daftar Alert'),
         backgroundColor: const Color(0xFF081021),
-        foregroundColor: Colors.white,
+        foregroundColor: NexusGuard.text,
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
@@ -158,3 +159,5 @@ class _AlertListScreenState extends State<AlertListScreen>
     );
   }
 }
+
+
