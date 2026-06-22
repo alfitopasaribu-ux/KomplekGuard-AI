@@ -13,7 +13,7 @@ const register = async (req, res) => {
     const user = await prisma.user.create({
       data: { name, email, passwordHash, phone, address, latitude, longitude },
     });
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '365d' });
     return sendSuccess(res, 'Registrasi berhasil', { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } }, 201);
   } catch (e) {
     return sendError(res, e.message, 500);
@@ -28,7 +28,7 @@ const login = async (req, res) => {
     if (!user || !user.isActive) return sendError(res, 'Email atau password salah', 401);
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) return sendError(res, 'Email atau password salah', 401);
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '365d' });
     return sendSuccess(res, 'Login berhasil', { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (e) {
     return sendError(res, e.message, 500);
