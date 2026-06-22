@@ -41,13 +41,13 @@ class VoiceService {
           onDone?.call();
         }
       },
-      listenOptions: SpeechListenOptions(
-        localeId: 'id_ID',
-        listenMode: ListenMode.confirmation,
-        partialResults: true,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 4),
-      ),
+     listenOptions: SpeechListenOptions(
+  localeId: 'id_ID',
+  listenMode: ListenMode.dictation,
+  partialResults: false,
+  listenFor: const Duration(seconds: 60),
+  pauseFor: const Duration(seconds: 6),
+),
     );
   }
 

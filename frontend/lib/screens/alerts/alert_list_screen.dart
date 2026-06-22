@@ -66,7 +66,7 @@ class _AlertListScreenState extends State<AlertListScreen>
   Color _statusColor(String? status) {
     switch (status) {
       case 'AKTIF':
-        return Colors.red;
+        return const Color(0xFF00E5FF);
       case 'DIPROSES':
         return Colors.orange;
       case 'SELESAI':
