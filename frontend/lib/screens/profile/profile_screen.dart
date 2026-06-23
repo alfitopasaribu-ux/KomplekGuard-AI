@@ -133,6 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _saving = true);
     try {
       final imageData = _getImageBase64() ?? _imageUrl;
+      // ignore: unused_local_variable
       final res = await ApiService.put('/users/profile', {
         'name'    : _nameCtrl.text.trim(),
         'phone'   : _phoneCtrl.text.trim(),
