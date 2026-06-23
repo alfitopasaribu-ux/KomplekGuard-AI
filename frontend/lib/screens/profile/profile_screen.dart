@@ -231,7 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: _saving ? null : _save,
             child: Text(
-              _saving ? '...' : _saved ? 'âœ“ TERSIMPAN' : 'SIMPAN',
+              _saving ? '...' : _saved ? 'Ã¢Å“â€œ TERSIMPAN' : 'SIMPAN',
               style: NexusGuard.mono(
                 color: _saved ? NexusGuard.green : NexusGuard.cyan, size: 13)),
           ),
@@ -304,7 +304,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       child: Text(
-                        _saving ? 'MENYIMPAN...' : _saved ? 'âœ“ TERSIMPAN' : 'SIMPAN PROFILE',
+                        _saving ? 'MENYIMPAN...' : _saved ? 'Ã¢Å“â€œ TERSIMPAN' : 'SIMPAN PROFILE',
                         style: NexusGuard.mono(color: NexusGuard.bg, size: 14, weight: FontWeight.bold),
                       ),
                     ),
