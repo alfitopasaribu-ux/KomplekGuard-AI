@@ -1,4 +1,6 @@
-﻿import 'dart:io';
+﻿import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/nexus_guard_theme.dart';
@@ -19,6 +21,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _picker      = ImagePicker();
 
   File?   _imageFile;
+  Uint8List? _imageBytes; // untuk web
   String? _imageUrl;
   bool    _loading = true;
   bool    _saving  = false;
@@ -31,15 +34,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final user = await AuthService.getUser();
-    if (!mounted) return;
-    setState(() {
-      _nameCtrl.text    = user?['name']    ?? '';
-      _phoneCtrl.text   = user?['phone']   ?? '';
-      _addressCtrl.text = user?['address'] ?? '';
-      _imageUrl         = user?['image'];
-      _loading          = false;
-    });
+    try {
+      // Load dari API langsung agar dapat data terbaru
+      final res = await ApiService.get('/users/profile');
+      if (!mounted) return;
+      final user = res['data'] ?? res;
+      setState(() {
+        _nameCtrl.text    = user['name']    ?? '';
+        _phoneCtrl.text   = user['phone']   ?? '';
+        _addressCtrl.text = user['address'] ?? '';
+        _imageUrl         = user['image'];
+        _loading          = false;
+      });
+    } catch (e) {
+      // Fallback ke local
+      final user = await AuthService.getUser();
+      if (!mounted) return;
+      setState(() {
+        _nameCtrl.text    = user?['name']    ?? '';
+        _phoneCtrl.text   = user?['phone']   ?? '';
+        _addressCtrl.text = user?['address'] ?? '';
+        _imageUrl         = user?['image'];
+        _loading          = false;
+      });
+    }
   }
 
   void _showSourcePicker() {
@@ -63,10 +81,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   _sourceBtn(Icons.photo_library_rounded, 'GALERI',
                     () => _pick(ImageSource.gallery)),
-                  _sourceBtn(Icons.camera_front_rounded, 'KAMERA\nDEPAN',
-                    () => _pick(ImageSource.camera, front: true)),
-                  _sourceBtn(Icons.camera_rear_rounded, 'KAMERA\nBELAKANG',
-                    () => _pick(ImageSource.camera, front: false)),
+                  if (!kIsWeb) ...[
+                    _sourceBtn(Icons.camera_front_rounded, 'KAMERA\nDEPAN',
+                      () => _pick(ImageSource.camera, front: true)),
+                    _sourceBtn(Icons.camera_rear_rounded, 'KAMERA\nBELAKANG',
+                      () => _pick(ImageSource.camera, front: false)),
+                  ] else
+                    _sourceBtn(Icons.camera_alt_rounded, 'KAMERA\n(MOBILE)',
+                      () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Kamera hanya tersedia di aplikasi mobile'),
+                            backgroundColor: Colors.orange),
+                        );
+                      }),
                 ],
               ),
               const SizedBox(height: 12),
@@ -81,24 +109,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Navigator.pop(context);
     final xfile = await _picker.pickImage(
       source: source,
-      preferredCameraDevice:
-          front ? CameraDevice.front : CameraDevice.rear,
+      preferredCameraDevice: front ? CameraDevice.front : CameraDevice.rear,
       imageQuality: 80,
     );
     if (xfile != null) {
-      setState(() => _imageFile = File(xfile.path));
+      if (kIsWeb) {
+        final bytes = await xfile.readAsBytes();
+        setState(() => _imageBytes = bytes);
+      } else {
+        setState(() => _imageFile = File(xfile.path));
+      }
     }
+  }
+
+  String? _getImageBase64() {
+    if (_imageBytes != null) {
+      return 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}';
+    }
+    return null;
   }
 
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await ApiService.put('/users/profile', {
+      final imageData = _getImageBase64() ?? _imageUrl;
+      final res = await ApiService.put('/users/profile', {
         'name'    : _nameCtrl.text.trim(),
         'phone'   : _phoneCtrl.text.trim(),
         'address' : _addressCtrl.text.trim(),
+        if (imageData != null) 'image': imageData,
       });
+
       if (!mounted) return;
+
+      // Update local storage
+      final user = await AuthService.getUser();
+      if (user != null) {
+        user['name']    = _nameCtrl.text.trim();
+        user['phone']   = _phoneCtrl.text.trim();
+        user['address'] = _addressCtrl.text.trim();
+        if (imageData != null) user['image'] = imageData;
+        await AuthService.saveToken(
+          (await ApiService.getToken())!,
+          user,
+        );
+      }
+
       setState(() { _saved = true; _saving = false; });
       Future.delayed(const Duration(seconds: 3),
         () { if (mounted) setState(() => _saved = false); });
@@ -155,11 +211,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: CircleAvatar(
                             radius: 56,
                             backgroundColor: NexusGuard.panel,
-                            backgroundImage: _imageFile != null
-                              ? FileImage(_imageFile!) as ImageProvider
-                              : (_imageUrl != null && _imageUrl!.isNotEmpty
-                                  ? NetworkImage(_imageUrl!) : null),
-                            child: (_imageFile == null &&
+                            backgroundImage: _imageBytes != null
+                              ? MemoryImage(_imageBytes!) as ImageProvider
+                              : _imageFile != null
+                                ? FileImage(_imageFile!) as ImageProvider
+                                : (_imageUrl != null && _imageUrl!.isNotEmpty
+                                    ? NetworkImage(_imageUrl!) : null),
+                            child: (_imageBytes == null && _imageFile == null &&
                                     (_imageUrl == null || _imageUrl!.isEmpty))
                               ? const Icon(Icons.person_rounded,
                                   size: 56, color: NexusGuard.cyan)
@@ -190,7 +248,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Text('GANTI FOTO PROFIL',
                       style: NexusGuard.mono(color: NexusGuard.cyan, size: 12)),
                   ),
-                  const SizedBox(height: 28),
+                  if (kIsWeb)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text('* Kamera hanya tersedia di aplikasi mobile',
+                        style: NexusGuard.mono(color: NexusGuard.muted, size: 11)),
+                    ),
+                  const SizedBox(height: 20),
                   _field('NAMA LENGKAP', _nameCtrl, Icons.person_outline_rounded),
                   const SizedBox(height: 16),
                   _field('NO. TELEPON', _phoneCtrl, Icons.phone_outlined,
@@ -277,4 +341,3 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 }
-
