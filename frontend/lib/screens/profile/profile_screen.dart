@@ -78,21 +78,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   _sourceBtn(Icons.photo_library_rounded, 'GALERI',
                     () => _pick(ImageSource.gallery)),
-                  if (!kIsWeb) ...[
-                    _sourceBtn(Icons.camera_front_rounded, 'KAMERA\nDEPAN',
-                      () => _pick(ImageSource.camera, front: true)),
-                    _sourceBtn(Icons.camera_rear_rounded, 'KAMERA\nBELAKANG',
-                      () => _pick(ImageSource.camera, front: false)),
-                  ] else
-                    _sourceBtn(Icons.camera_alt_rounded, 'KAMERA\n(MOBILE)', () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Kamera langsung hanya di aplikasi mobile'),
-                          backgroundColor: Colors.orange,
-                        ),
-                      );
-                    }),
+                  _sourceBtn(Icons.camera_front_rounded, 'KAMERA\nDEPAN',
+                    () => _pick(ImageSource.camera, front: true)),
+                  _sourceBtn(Icons.camera_rear_rounded, 'KAMERA\nBELAKANG',
+                    () => _pick(ImageSource.camera, front: false)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -242,7 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: _saving ? null : _save,
             child: Text(
-              _saving ? '...' : _saved ? '✓ TERSIMPAN' : 'SIMPAN',
+              _saving ? '...' : _saved ? 'âœ“ TERSIMPAN' : 'SIMPAN',
               style: NexusGuard.mono(
                 color: _saved ? NexusGuard.green : NexusGuard.cyan, size: 13)),
           ),
@@ -315,7 +304,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       child: Text(
-                        _saving ? 'MENYIMPAN...' : _saved ? '✓ TERSIMPAN' : 'SIMPAN PROFILE',
+                        _saving ? 'MENYIMPAN...' : _saved ? 'âœ“ TERSIMPAN' : 'SIMPAN PROFILE',
                         style: NexusGuard.mono(color: NexusGuard.bg, size: 14, weight: FontWeight.bold),
                       ),
                     ),
