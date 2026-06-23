@@ -242,11 +242,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             icon: const Icon(Icons.person_rounded, color: NexusGuard.cyan),
           ),
           IconButton(
-            tooltip: 'Profile',
-            onPressed: _openProfile,
-            icon: const Icon(Icons.person_rounded, color: NexusGuard.cyan),
-          ),
-          IconButton(
             tooltip: 'Logout',
             onPressed: _logout,
             icon: const Icon(Icons.logout_rounded, color: NexusGuard.red),
