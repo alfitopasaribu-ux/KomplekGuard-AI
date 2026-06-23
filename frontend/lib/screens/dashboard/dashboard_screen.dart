@@ -11,6 +11,7 @@ import '../alerts/alert_list_screen.dart';
 import '../alerts/create_alert_screen.dart';
 import '../auth/login_screen.dart';
 import '../map/map_screen.dart';
+import '../profile/profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -126,6 +127,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  void _openProfile() {
+    Navigator.push(context,
+      MaterialPageRoute(builder: (_) => const ProfileScreen()));
+  }
+
   void _openAlertList() {
     Navigator.push(
       context,
@@ -229,6 +235,16 @@ class _DashboardScreenState extends State<DashboardScreen>
             tooltip: 'Tactical Map',
             onPressed: _openMap,
             icon: const Icon(Icons.map_rounded, color: NexusGuard.cyan),
+          ),
+          IconButton(
+            tooltip: 'Profile',
+            onPressed: _openProfile,
+            icon: const Icon(Icons.person_rounded, color: NexusGuard.cyan),
+          ),
+          IconButton(
+            tooltip: 'Profile',
+            onPressed: _openProfile,
+            icon: const Icon(Icons.person_rounded, color: NexusGuard.cyan),
           ),
           IconButton(
             tooltip: 'Logout',
@@ -714,3 +730,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 }
+
+
+
+
+
+
+
