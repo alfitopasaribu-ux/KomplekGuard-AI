@@ -14,7 +14,8 @@ model User {
   passwordHash    String
   phone           String?
   role            Role              @default(WARGA)
-  address         String?
+  address     String?
+  image       String?   @db.Text
   latitude        Float?
   longitude       Float?
   isActive        Boolean           @default(true)
@@ -38,7 +39,8 @@ model User {
 model Neighborhood {
   id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
   name      String
-  address   String?
+  address     String?
+  image       String?   @db.Text
   latitude  Float?
   longitude Float?
   createdAt DateTime @default(now())
@@ -73,7 +75,8 @@ model Alert {
   status              AlertStatus         @default(AKTIF)
   latitude            Float
   longitude           Float
-  address             String?
+  address     String?
+  image       String?   @db.Text
   photoUrl            String?
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @default(now()) @updatedAt
@@ -176,7 +179,8 @@ model ActivityLog {
   action      String
   description String?
   createdAt   DateTime @default(now())
-  ipAddress   String?
+  ipaddress     String?
+  image       String?   @db.Text
   userAgent   String?
   user        User     @relation(fields: [userId], references: [id])
 

@@ -1,8 +1,8 @@
 ﻿import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../../core/theme/nexus_guard_theme.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
@@ -20,12 +20,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _addressCtrl = TextEditingController();
   final _picker      = ImagePicker();
 
-  File?   _imageFile;
-  Uint8List? _imageBytes; // untuk web
-  String? _imageUrl;
-  bool    _loading = true;
-  bool    _saving  = false;
-  bool    _saved   = false;
+  Uint8List? _imageBytes;
+  String?    _imageUrl;
+  bool _loading = true;
+  bool _saving  = false;
+  bool _saved   = false;
 
   @override
   void initState() {
@@ -35,7 +34,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      // Load dari API langsung agar dapat data terbaru
       final res = await ApiService.get('/users/profile');
       if (!mounted) return;
       final user = res['data'] ?? res;
@@ -47,7 +45,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _loading          = false;
       });
     } catch (e) {
-      // Fallback ke local
       final user = await AuthService.getUser();
       if (!mounted) return;
       setState(() {
@@ -87,14 +84,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _sourceBtn(Icons.camera_rear_rounded, 'KAMERA\nBELAKANG',
                       () => _pick(ImageSource.camera, front: false)),
                   ] else
-                    _sourceBtn(Icons.camera_alt_rounded, 'KAMERA\n(MOBILE)',
-                      () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Kamera hanya tersedia di aplikasi mobile'),
-                            backgroundColor: Colors.orange),
-                        );
-                      }),
+                    _sourceBtn(Icons.camera_alt_rounded, 'KAMERA\n(MOBILE)', () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Kamera langsung hanya di aplikasi mobile'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }),
                 ],
               ),
               const SizedBox(height: 12),
@@ -107,64 +105,117 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pick(ImageSource source, {bool front = true}) async {
     Navigator.pop(context);
-    final xfile = await _picker.pickImage(
-      source: source,
-      preferredCameraDevice: front ? CameraDevice.front : CameraDevice.rear,
-      imageQuality: 80,
-    );
-    if (xfile != null) {
-      if (kIsWeb) {
-        final bytes = await xfile.readAsBytes();
-        setState(() => _imageBytes = bytes);
-      } else {
-        setState(() => _imageFile = File(xfile.path));
+    try {
+      final xfile = await _picker.pickImage(
+        source: source,
+        preferredCameraDevice: front ? CameraDevice.front : CameraDevice.rear,
+        imageQuality: 85,
+        maxWidth: 800,
+        maxHeight: 800,
+      );
+      if (xfile == null) return;
+
+      Uint8List bytes = await xfile.readAsBytes();
+
+      if (!kIsWeb) {
+        final compressed = await FlutterImageCompress.compressWithList(
+          bytes,
+          minWidth: 400,
+          minHeight: 400,
+          quality: 75,
+          format: CompressFormat.jpeg,
+        );
+        bytes = compressed;
       }
+
+      if (bytes.length > 2500000) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Foto terlalu besar. Pilih foto yang lebih kecil.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        _imageBytes = bytes;
+        _imageUrl   = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memilih foto: $e'), backgroundColor: NexusGuard.red),
+      );
     }
   }
 
-  String? _getImageBase64() {
-    if (_imageBytes != null) {
-      return 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}';
+  String? _imageToBase64() {
+    if (_imageBytes == null) return null;
+    return 'data:image/jpeg;base64,${base64Encode(_imageBytes!)}';
+  }
+
+  ImageProvider? _buildImageProvider() {
+    if (_imageBytes != null) return MemoryImage(_imageBytes!);
+    if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+      if (_imageUrl!.startsWith('data:')) {
+        final base64Str = _imageUrl!.split(',').last;
+        return MemoryImage(base64Decode(base64Str));
+      }
+      return NetworkImage(_imageUrl!);
     }
     return null;
   }
 
   Future<void> _save() async {
+    final name    = _nameCtrl.text.trim();
+    final phone   = _phoneCtrl.text.trim();
+    final address = _addressCtrl.text.trim();
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama tidak boleh kosong'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
-      final imageData = _getImageBase64() ?? _imageUrl;
-      // ignore: unused_local_variable
-      final res = await ApiService.put('/users/profile', {
-        'name'    : _nameCtrl.text.trim(),
-        'phone'   : _phoneCtrl.text.trim(),
-        'address' : _addressCtrl.text.trim(),
+      final imageData = _imageToBase64() ?? _imageUrl;
+      final body = <String, dynamic>{
+        'name': name,
+        'phone': phone,
+        'address': address,
         if (imageData != null) 'image': imageData,
-      });
+      };
 
+      final res = await ApiService.put('/users/profile', body);
       if (!mounted) return;
 
-      // Update local storage
+      if (res['success'] != true) {
+        throw Exception(res['message'] ?? 'Gagal menyimpan profil');
+      }
+
       final user = await AuthService.getUser();
       if (user != null) {
-        user['name']    = _nameCtrl.text.trim();
-        user['phone']   = _phoneCtrl.text.trim();
-        user['address'] = _addressCtrl.text.trim();
+        user['name']    = name;
+        user['phone']   = phone;
+        user['address'] = address;
         if (imageData != null) user['image'] = imageData;
-        await AuthService.saveToken(
-          (await ApiService.getToken())!,
-          user,
-        );
+        final token = await ApiService.getToken();
+        if (token != null) await AuthService.saveToken(token, user);
       }
 
       setState(() { _saved = true; _saving = false; });
-      Future.delayed(const Duration(seconds: 3),
-        () { if (mounted) setState(() => _saved = false); });
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _saved = false);
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menyimpan: $e'),
-          backgroundColor: NexusGuard.red),
+        SnackBar(content: Text('Gagal menyimpan: $e'), backgroundColor: NexusGuard.red),
       );
     }
   }
@@ -212,16 +263,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: CircleAvatar(
                             radius: 56,
                             backgroundColor: NexusGuard.panel,
-                            backgroundImage: _imageBytes != null
-                              ? MemoryImage(_imageBytes!) as ImageProvider
-                              : _imageFile != null
-                                ? FileImage(_imageFile!) as ImageProvider
-                                : (_imageUrl != null && _imageUrl!.isNotEmpty
-                                    ? NetworkImage(_imageUrl!) : null),
-                            child: (_imageBytes == null && _imageFile == null &&
-                                    (_imageUrl == null || _imageUrl!.isEmpty))
-                              ? const Icon(Icons.person_rounded,
-                                  size: 56, color: NexusGuard.cyan)
+                            backgroundImage: _buildImageProvider(),
+                            child: _buildImageProvider() == null
+                              ? const Icon(Icons.person_rounded, size: 56, color: NexusGuard.cyan)
                               : null,
                           ),
                         ),
@@ -232,11 +276,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(7),
                               decoration: const BoxDecoration(
-                                color: NexusGuard.cyan,
-                                shape: BoxShape.circle,
+                                color: NexusGuard.cyan, shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.camera_alt_rounded,
-                                size: 18, color: NexusGuard.bg),
+                              child: const Icon(Icons.camera_alt_rounded, size: 18, color: NexusGuard.bg),
                             ),
                           ),
                         ),
@@ -258,8 +300,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 20),
                   _field('NAMA LENGKAP', _nameCtrl, Icons.person_outline_rounded),
                   const SizedBox(height: 16),
-                  _field('NO. TELEPON', _phoneCtrl, Icons.phone_outlined,
-                    keyboard: TextInputType.phone),
+                  _field('NO. TELEPON', _phoneCtrl, Icons.phone_outlined, keyboard: TextInputType.phone),
                   const SizedBox(height: 16),
                   _field('ALAMAT', _addressCtrl, Icons.home_outlined, maxLines: 3),
                   const SizedBox(height: 32),
@@ -271,13 +312,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         backgroundColor: NexusGuard.cyan,
                         foregroundColor: NexusGuard.bg,
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       child: Text(
                         _saving ? 'MENYIMPAN...' : _saved ? '✓ TERSIMPAN' : 'SIMPAN PROFILE',
-                        style: NexusGuard.mono(color: NexusGuard.bg, size: 14,
-                          weight: FontWeight.bold),
+                        style: NexusGuard.mono(color: NexusGuard.bg, size: 14, weight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -327,8 +366,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             filled: true,
             fillColor: NexusGuard.panel,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -342,3 +380,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 }
+
