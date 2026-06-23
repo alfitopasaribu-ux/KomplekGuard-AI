@@ -1,5 +1,4 @@
-﻿const { PrismaClient } = require('../generated/prisma');
-const prisma = new PrismaClient();
+﻿const prisma = require('../config/database');
 
 const getProfile = async (req, res) => {
   try {
@@ -28,4 +27,5 @@ const updateProfile = async (req, res) => {
 };
 
 module.exports = { getProfile, updateProfile };
+
 
