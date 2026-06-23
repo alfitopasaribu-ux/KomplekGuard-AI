@@ -11,6 +11,7 @@ const aiRoutes = require('./src/routes/ai.routes');
 const dashboardRoutes = require('./src/routes/dashboard.routes');
 const emergencyContactRoutes = require('./src/routes/emergencyContact.routes');
 const safetyAiRoutes = require('./src/routes/safetyAi.routes');
+const userRoutes = require('./src/routes/user.routes');
 
 const errorMiddleware = require('./src/middleware/error.middleware');
 
@@ -60,7 +61,10 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/emergency-contacts', emergencyContactRoutes);
 app.use('/api/safety-ai', safetyAiRoutes);
+app.use('/api/users', userRoutes);
 
 app.use(errorMiddleware);
 
 module.exports = app;
+
+
