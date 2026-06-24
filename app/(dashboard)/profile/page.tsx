@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import CameraCapture from "@/components/profile/CameraCapture";
@@ -10,6 +10,7 @@ export default function ProfilePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [everSaved, setEverSaved] = useState(false);
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -31,15 +32,34 @@ export default function ProfilePage() {
       });
   }, []);
 
-  const handleGallery = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-      setForm((f) => ({ ...f, image: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
+    e.target.value = "";
+    const compressed = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const imgEl = new Image();
+        imgEl.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX = 400;
+          let w = imgEl.width, h = imgEl.height;
+          if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+          else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("Canvas error"));
+          ctx.drawImage(imgEl, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.7));
+        };
+        imgEl.onerror = () => reject(new Error("Gagal membaca gambar"));
+        imgEl.src = ev.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error("Gagal membaca file"));
+      reader.readAsDataURL(file);
+    });
+    setPreview(compressed);
+    setForm((f) => ({ ...f, image: compressed }));
     setShowSourcePicker(false);
   };
 
@@ -59,6 +79,7 @@ export default function ProfilePage() {
     });
     setSaving(false);
     setSaved(true);
+    setEverSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
@@ -85,7 +106,7 @@ export default function ProfilePage() {
                 onClick={() => fileInputRef.current?.click()}
                 className="flex flex-col items-center gap-2 p-4 border border-[#00FF88]/30 rounded-xl hover:border-[#00FF88] hover:bg-[#00FF88]/5 transition-all"
               >
-                <span className="text-3xl">???</span>
+                <span className="text-3xl">🖼️</span>
                 <span className="text-xs text-gray-400 tracking-widest">GALERI</span>
               </button>
               {/* Kamera Depan */}
@@ -93,7 +114,7 @@ export default function ProfilePage() {
                 onClick={() => setShowCamera(true)}
                 className="flex flex-col items-center gap-2 p-4 border border-[#00FF88]/30 rounded-xl hover:border-[#00FF88] hover:bg-[#00FF88]/5 transition-all"
               >
-                <span className="text-3xl">??</span>
+                <span className="text-3xl">📷</span>
                 <span className="text-xs text-gray-400 tracking-widest">KAMERA</span>
               </button>
               {/* Kamera Belakang */}
@@ -101,7 +122,7 @@ export default function ProfilePage() {
                 onClick={() => setShowCamera(true)}
                 className="flex flex-col items-center gap-2 p-4 border border-[#00FF88]/30 rounded-xl hover:border-[#00FF88] hover:bg-[#00FF88]/5 transition-all"
               >
-                <span className="text-3xl">??</span>
+                <span className="text-3xl">🤳</span>
                 <span className="text-xs text-gray-400 tracking-widest">LIVE</span>
               </button>
             </div>
@@ -135,7 +156,7 @@ export default function ProfilePage() {
           disabled={saving}
           className="px-6 py-2 bg-[#00FF88] text-black text-sm font-bold tracking-widest rounded-lg hover:bg-[#00FF88]/80 disabled:opacity-50 transition-all"
         >
-          {saving ? "..." : saved ? "? TERSIMPAN" : "SIMPAN"}
+          {saving ? "..." : saved ? "TERSIMPAN" : everSaved ? "GANTI PROFIL" : "SIMPAN"}
         </button>
       </div>
 
@@ -190,7 +211,7 @@ export default function ProfilePage() {
       {/* Save toast */}
       {saved && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#00FF88] text-black px-6 py-3 rounded-full text-sm font-bold tracking-widest shadow-xl">
-          ? PROFILE DIPERBARUI
+          PROFILE DIPERBARUI
         </div>
       )}
     </div>
