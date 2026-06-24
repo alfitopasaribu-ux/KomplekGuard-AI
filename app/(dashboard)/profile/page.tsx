@@ -10,7 +10,10 @@ export default function ProfilePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [everSaved, setEverSaved] = useState(false);
+  const [everSaved, setEverSaved] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("profileSaved") === "true";
+    return false;
+  });
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -80,6 +83,7 @@ export default function ProfilePage() {
     setSaving(false);
     setSaved(true);
     setEverSaved(true);
+    localStorage.setItem("profileSaved", "true");
     setTimeout(() => setSaved(false), 3000);
   };
 
