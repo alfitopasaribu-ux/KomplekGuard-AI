@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -22,9 +22,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Uint8List? _imageBytes;
   String?    _imageUrl;
-  bool _loading = true;
-  bool _saving  = false;
-  bool _saved   = false;
+  bool _loading   = true;
+  bool _saving    = false;
+  bool _saved     = false;
+  bool _everSaved = false;
 
   @override
   void initState() {
@@ -196,7 +197,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (token != null) await AuthService.saveToken(token, user);
       }
 
-      setState(() { _saved = true; _saving = false; });
+      setState(() { _saved = true; _saving = false; _everSaved = true; });
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) setState(() => _saved = false);
       });
@@ -231,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: _saving ? null : _save,
             child: Text(
-              _saving ? '...' : _saved ? 'Ã¢Å“â€œ TERSIMPAN' : 'SIMPAN',
+              _saving ? '...' : _saved ? 'TERSIMPAN' : _everSaved ? 'GANTI PROFIL' : 'SIMPAN',
               style: NexusGuard.mono(
                 color: _saved ? NexusGuard.green : NexusGuard.cyan, size: 13)),
           ),
@@ -280,12 +281,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Text('GANTI FOTO PROFIL',
                       style: NexusGuard.mono(color: NexusGuard.cyan, size: 12)),
                   ),
-                  if (kIsWeb)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text('* Kamera hanya tersedia di aplikasi mobile',
-                        style: NexusGuard.mono(color: NexusGuard.muted, size: 11)),
-                    ),
                   const SizedBox(height: 20),
                   _field('NAMA LENGKAP', _nameCtrl, Icons.person_outline_rounded),
                   const SizedBox(height: 16),
@@ -304,7 +299,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       child: Text(
-                        _saving ? 'MENYIMPAN...' : _saved ? 'Ã¢Å“â€œ TERSIMPAN' : 'SIMPAN PROFILE',
+                        _saving ? 'MENYIMPAN...' : _saved ? 'TERSIMPAN' : _everSaved ? 'GANTI PROFIL' : 'SIMPAN PROFILE',
                         style: NexusGuard.mono(color: NexusGuard.bg, size: 14, weight: FontWeight.bold),
                       ),
                     ),
@@ -369,4 +364,3 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 }
-
