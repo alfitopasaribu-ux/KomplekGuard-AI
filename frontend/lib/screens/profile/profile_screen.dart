@@ -132,6 +132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _imageBytes = bytes;
         _imageUrl   = null;
+        _everSaved  = false;
       });
     } catch (e) {
       if (!mounted) return;
