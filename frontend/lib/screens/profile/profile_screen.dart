@@ -230,7 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: NexusGuard.orbitron(size: 18, color: NexusGuard.cyan, spacing: 3)),
         actions: [
           TextButton(
-            onPressed: _saving ? null : _save,
+            onPressed: _saving ? null : (_everSaved ? _showSourcePicker : _save),
             child: Text(
               _saving ? '...' : _saved ? 'TERSIMPAN' : _everSaved ? 'GANTI PROFIL' : 'SIMPAN',
               style: NexusGuard.mono(
@@ -291,7 +291,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _saving ? null : _save,
+                      onPressed: _saving ? null : (_everSaved ? _showSourcePicker : _save),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: NexusGuard.cyan,
                         foregroundColor: NexusGuard.bg,
