@@ -4,3 +4,7 @@ dist/
 .env
 /.dart_tool/
 /packages/
+.next/
+out/
+*.tsbuildinfo
+.cache/
