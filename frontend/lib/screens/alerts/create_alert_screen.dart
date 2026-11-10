@@ -910,11 +910,108 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
                   ).copyWith(
                     hintText:
                         'Apa yang terjadi? Ada bahaya atau bantuan yang dibutuhkan?',
+                    suffixIcon: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: IconButton(
+                        key: const Key('create_voice'),
+                        tooltip: _voiceListening
+                            ? 'Hentikan dikte'
+                            : 'Isi deskripsi dengan suara',
+                        onPressed: _locked ? null : _toggleVoiceDescription,
+                        icon: Icon(
+                          _voiceListening
+                              ? Icons.stop_circle_outlined
+                              : Icons.mic_rounded,
+                          color: _voiceListening
+                              ? NexusGuard.red
+                              : NexusGuard.emerald,
+                        ),
+                      ),
+                    ),
                   ),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Isi deskripsi kejadian.'
                       : null,
                 ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    key: const Key('create_ai_draft'),
+                    onPressed: _locked || _aiDraftLoading
+                        ? null
+                        : _generateAiDraftFromVoice,
+                    icon: _aiDraftLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.auto_awesome_outlined,
+                            size: 20,
+                          ),
+                    label: Text(
+                      _aiDraftLoading
+                          ? 'Merapikan deskripsi...'
+                          : 'Rapikan dengan AI',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_voiceListening) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _softRed,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.graphic_eq_rounded,
+                          color: NexusGuard.red,
+                          size: 19,
+                        ),
+                        SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            'Mendengarkan... ketuk mikrofon untuk berhenti.',
+                            style: TextStyle(
+                              color: NexusGuard.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                const Text(
+                  'Gunakan mikrofon untuk mengisi deskripsi dengan suara. '
+                  'Periksa transkripsi sebelum mengirim. Audio tidak disimpan.',
+                  style: TextStyle(
+                    color: NexusGuard.muted,
+                    fontSize: 11,
+                    height: 1.5,
+                  ),
+                ),
+                if (_draftError != null) ...[
+                  const SizedBox(height: 12),
+                  _notice(
+                    _draftError!,
+                    key: const Key('create_draft_error'),
+                  ),
+                ],
                 const SizedBox(height: 15),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -948,8 +1045,6 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        _voicePanel(),
       ],
     );
   }
@@ -1053,95 +1148,6 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
           _notice(_photoError!),
         ],
       ],
-    );
-  }
-
-  Widget _voicePanel() {
-    return _section(
-      icon: Icons.mic_none_rounded,
-      title: 'Ceritakan dengan Suara',
-      subtitle:
-          'Tidak sempat mengetik? Gunakan mikrofon untuk mengisi deskripsi.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(13),
-            decoration: BoxDecoration(
-              color: _voiceListening ? _softRed : _softGreen,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _voiceListening
-                      ? Icons.graphic_eq_rounded
-                      : Icons.record_voice_over_outlined,
-                  color: _voiceListening ? NexusGuard.red : NexusGuard.emerald,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _voiceListening
-                        ? 'Mendengarkan... tekan berhenti bila selesai.'
-                        : 'Ucapan akan muncul pada kolom deskripsi.',
-                    style: const TextStyle(fontSize: 12, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          FilledButton.icon(
-            key: const Key('create_voice'),
-            onPressed: _locked ? null : _toggleVoiceDescription,
-            icon: Icon(_voiceListening
-                ? Icons.stop_circle_outlined
-                : Icons.mic_rounded),
-            label: Text(_voiceListening ? 'Hentikan' : 'Mulai Bicara'),
-            style: FilledButton.styleFrom(
-              backgroundColor:
-                  _voiceListening ? NexusGuard.red : NexusGuard.emerald,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            key: const Key('create_ai_draft'),
-            onPressed: _locked ? null : _generateAiDraftFromVoice,
-            icon: _aiDraftLoading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.auto_awesome_outlined, size: 20),
-            label: Text(_aiDraftLoading
-                ? 'Merapikan deskripsi...'
-                : 'Rapikan dengan AI'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 13),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Periksa dan sunting transkripsi sebelum mengirim. '
-            'Fitur ini bukan rekaman audio yang disimpan.',
-            style: TextStyle(
-              color: NexusGuard.muted,
-              fontSize: 11,
-              height: 1.5,
-            ),
-          ),
-          if (_draftError != null) ...[
-            const SizedBox(height: 12),
-            _notice(_draftError!, key: const Key('create_draft_error')),
-          ],
-        ],
-      ),
     );
   }
 
