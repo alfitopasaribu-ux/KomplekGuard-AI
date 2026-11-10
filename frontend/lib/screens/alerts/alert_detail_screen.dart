@@ -1,728 +1,691 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import '../../core/theme/nexus_guard_theme.dart';
 import '../../services/alert_service.dart';
 import '../../services/auth_service.dart';
+import '../map/map_screen.dart';
 
 class AlertDetailScreen extends StatefulWidget {
   final String alertId;
 
-  const AlertDetailScreen({
-    super.key,
-    required this.alertId,
-  });
+  const AlertDetailScreen({super.key, required this.alertId});
 
   @override
   State<AlertDetailScreen> createState() => _AlertDetailScreenState();
 }
 
+enum _DetailAction { response, status, delete }
+
 class _AlertDetailScreenState extends State<AlertDetailScreen> {
+  static const _timeout = Duration(seconds: 20);
+  static const _statuses = ['AKTIF', 'DIPROSES', 'SELESAI', 'DIBATALKAN'];
+  static const _responseStatuses = ['SAYA_BISA_BANTU', 'MENUJU_LOKASI', 'SUDAH_DI_LOKASI'];
+
+  final _responseNote = TextEditingController();
   Map<String, dynamic>? _alert;
   Map<String, dynamic>? _currentUser;
   bool _loading = true;
+  bool _loadInFlight = false;
+  bool _refreshing = false;
   bool _actionLoading = false;
+  bool _confirming = false;
+  bool _selectingStatus = false;
+  String? _loadError;
+  String? _actionError;
+  _DetailAction? _retryAction;
+  String? _retryStatus;
   Timer? _pollingTimer;
+
+  bool get _busy => _loadInFlight || _actionLoading || _confirming || _selectingStatus;
+  bool get _canInteract => _alert != null && _loadError == null && _id(_currentUser?['id']) != null;
 
   @override
   void initState() {
     super.initState();
     _load();
     _pollingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      _load(silent: true);
+      if (mounted && !_busy && ModalRoute.of(context)?.isCurrent != false) {
+        _load(silent: true);
+      }
     });
   }
 
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _responseNote.dispose();
     super.dispose();
   }
 
-  Future<void> _load({bool silent = false}) async {
-    try {
-      if (!silent && mounted) setState(() => _loading = true);
+  String? _id(dynamic value) {
+    final result = value?.toString().trim();
+    return result == null || result.isEmpty ? null : result;
+  }
 
-      final user = await AuthService.getUser();
-      final res = await AlertService.getAlertDetail(widget.alertId);
+  bool _belongsToCurrentUser(Map<String, dynamic> item) {
+    final currentId = _id(_currentUser?['id']);
+    final user = item['user'];
+    final nestedId = user is Map ? _id(user['id']) : null;
+    final directId = _id(item['userId']);
+    if (currentId == null || (directId == null && nestedId == null)) return false;
+    return (directId == null || directId == currentId) && (nestedId == null || nestedId == currentId);
+  }
 
-      if (!mounted) return;
+  bool get _isOwner => _alert != null && _belongsToCurrentUser(_alert!);
 
-      setState(() {
-        _currentUser = user == null ? null : Map<String, dynamic>.from(user);
+  List<Map<String, dynamic>> get _responses {
+    final responses = _alert?['responses'];
+    if (responses is! List) return [];
+    return responses.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
 
-        if (res['success'] == true) {
-          _alert = Map<String, dynamic>.from(res['data']);
-        }
-
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() => _loading = false);
-
-      if (!silent) {
-        _showSnack('Gagal memuat detail alert: $e');
+  Map<String, dynamic>? get _latestOwnResponse {
+    Map<String, dynamic>? latest;
+    for (final response in _responses.where(_belongsToCurrentUser)) {
+      final candidateTime = DateTime.tryParse(response['createdAt']?.toString() ?? '');
+      final latestTime = DateTime.tryParse(latest?['createdAt']?.toString() ?? '');
+      if (latest == null || (candidateTime != null && (latestTime == null || candidateTime.isAfter(latestTime)))) {
+        latest = response;
       }
+    }
+    return latest;
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (_loadInFlight || !mounted) return;
+    _loadInFlight = true;
+    setState(() {
+      _loading = _alert == null;
+      _refreshing = _alert != null;
+    });
+    try {
+      final user = await AuthService.getUser();
+      if (!mounted) return;
+      setState(() => _currentUser = user);
+      final response = await AlertService.getAlertDetail(widget.alertId).timeout(_timeout);
+      if (response['success'] != true) {
+        throw _DetailFailure(_message(response, 'Detail laporan belum dapat dimuat.'));
+      }
+      if (response['data'] is! Map) {
+        throw const _DetailFailure('Data detail laporan belum tersedia.');
+      }
+      final alert = Map<String, dynamic>.from(response['data'] as Map);
+      if (!mounted) return;
+      setState(() {
+        _alert = alert;
+        _loadError = null;
+        _loading = false;
+        _refreshing = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _refreshing = false;
+        _loadError = _failureMessage(error, 'Detail laporan belum dapat dimuat. Periksa koneksi lalu coba lagi.');
+      });
+    } finally {
+      _loadInFlight = false;
     }
   }
 
-  bool get _isOwner {
-    final reporterId = _alert?['user']?['id']?.toString();
-    final currentId = _currentUser?['id']?.toString();
+  String _message(Map<String, dynamic> response, String fallback) {
+    final message = response['message']?.toString().trim() ?? '';
+    return message.isEmpty ? fallback : message;
+  }
 
-    return reporterId != null && currentId != null && reporterId == currentId;
+  String _failureMessage(Object error, String fallback) {
+    if (error is _DetailFailure) return error.message;
+    if (error is TimeoutException) return 'Waktu koneksi habis. Periksa koneksi lalu coba lagi.';
+    return fallback;
+  }
+
+  void _failedAction(_DetailAction action, String? status, String message) {
+    if (!mounted) return;
+    setState(() {
+      _actionError = message;
+      _retryAction = action;
+      _retryStatus = status;
+    });
   }
 
   Future<void> _respond(String status) async {
+    if (_busy || !_canInteract || !_responseStatuses.contains(status)) return;
+    setState(() { _actionLoading = true; _actionError = null; });
     try {
-      final res = await AlertService.respondToAlert(widget.alertId, status);
-
+      final user = await AuthService.getUser();
       if (!mounted) return;
-
-      _showSnack(
-        res['success'] == true
-            ? 'Respons terkirim. Pelapor dapat melihat bantuanmu.'
-            : (res['message'] ?? 'Gagal mengirim respons'),
-      );
-
+      setState(() => _currentUser = user);
+      if (_id(user?['id']) == null) {
+        throw const _DetailFailure('Akun Anda belum tersedia. Muat ulang detail sebelum merespons.');
+      }
+      final note = _responseNote.text.trim();
+      final response = await AlertService.respondToAlert(
+        widget.alertId, status, note: note.isEmpty ? null : note,
+      ).timeout(_timeout);
+      if (!mounted) return;
+      if (response['success'] != true) {
+        throw _DetailFailure(_message(response, 'Respons belum berhasil dikirim.'));
+      }
+      _responseNote.clear();
+      setState(() { _retryAction = null; _retryStatus = null; });
+      _showSnack('Respons terkirim. Pelapor dapat melihat bantuan Anda.');
       await _load(silent: true);
-    } catch (e) {
-      _showSnack('Error: $e');
+    } catch (error) {
+      _failedAction(_DetailAction.response, status,
+        _failureMessage(error, 'Respons belum berhasil dikirim. Silakan coba lagi.'));
+    } finally {
+      if (mounted) setState(() => _actionLoading = false);
     }
   }
 
-  Future<void> _updateStatus(String status) async {
-    if (!_isOwner) {
-      _showSnack('Hanya pelapor yang dapat mengubah status alert ini.');
-      return;
-    }
-
-    final confirm = await _confirmDialog(
-      title: 'Ubah Status Alert',
-      message: 'Yakin ingin mengubah status alert menjadi $status?',
-      actionText: 'UBAH',
-      danger: false,
+  Future<void> _selectStatus() async {
+    if (_busy || !_canInteract || !_isOwner) return;
+    setState(() => _selectingStatus = true);
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(child: SingleChildScrollView(child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(padding: const EdgeInsets.all(12), child: Text('Ubah status laporan', style: Theme.of(context).textTheme.titleLarge)),
+          for (final status in _statuses) ListTile(
+            key: ValueKey('detail-status-option-$status'),
+            title: Text(_statusLabel(status)),
+            leading: Icon(_statusIcon(status), color: _statusColor(status)),
+            trailing: _alert?['status'] == status ? const Icon(Icons.check_rounded, color: NexusGuard.emerald) : null,
+            onTap: () => Navigator.pop(context, status),
+          ),
+        ]),
+      ))),
     );
-
-    if (confirm != true) return;
-
-    setState(() => _actionLoading = true);
-
-    try {
-      final res = await AlertService.updateStatus(
-        widget.alertId,
-        status,
-        note: 'Status diubah oleh pelapor',
-      );
-
-      if (!mounted) return;
-
-      _showSnack(
-        res['success'] == true
-            ? 'Status alert berhasil diubah menjadi $status.'
-            : (res['message'] ?? 'Gagal mengubah status'),
-      );
-
-      await _load(silent: true);
-    } catch (e) {
-      _showSnack('Error: $e');
-    }
-
-    if (mounted) {
-      setState(() => _actionLoading = false);
-    }
+    if (!mounted) return;
+    setState(() => _selectingStatus = false);
+    if (selected != null) await _updateStatus(selected);
   }
 
-  Future<void> _deleteAlert() async {
+  Future<void> _updateStatus(String status) => _ownerMutation(status: status);
+  Future<void> _deleteAlert() => _ownerMutation(delete: true);
+
+  Future<void> _ownerMutation({String? status, bool delete = false}) async {
+    if (_busy || !_canInteract) return;
     if (!_isOwner) {
-      _showSnack('Hanya pelapor yang dapat menghapus alert ini.');
+      _showSnack('Hanya pelapor yang dapat mengubah atau menghapus laporan ini.');
       return;
     }
-
-    final confirm = await _confirmDialog(
-      title: 'Hapus Alert',
-      message:
-          'Yakin ingin menghapus alert ini? Data alert, respons warga, dan analisis AI terkait akan dihapus.',
-      actionText: 'HAPUS',
-      danger: true,
-    );
-
-    if (confirm != true) return;
-
-    setState(() => _actionLoading = true);
-
+    if (!delete && !_statuses.contains(status)) return;
+    setState(() => _confirming = true);
     try {
-      final res = await AlertService.deleteAlert(widget.alertId);
-
+      final confirmed = await _confirmDialog(delete: delete, status: status);
+      if (!mounted || confirmed != true) return;
+      final user = await AuthService.getUser();
+      if (!mounted || _actionLoading || _loadInFlight) return;
+      setState(() => _currentUser = user);
+      if (!_isOwner) {
+        _failedAction(delete ? _DetailAction.delete : _DetailAction.status, status,
+          'Akses ditolak. Akun saat ini bukan pelapor laporan ini.');
+        return;
+      }
+      setState(() { _confirming = false; _actionLoading = true; _actionError = null; });
+      final response = delete
+          ? await AlertService.deleteAlert(widget.alertId).timeout(_timeout)
+          : await AlertService.updateStatus(widget.alertId, status!, note: 'Status diubah oleh pelapor').timeout(_timeout);
       if (!mounted) return;
-
-      if (res['success'] == true) {
-        _showSnack('Alert berhasil dihapus.');
+      if (response['success'] != true) {
+        throw _DetailFailure(_message(response, delete ? 'Laporan belum berhasil dihapus.' : 'Status belum berhasil diperbarui.'));
+      }
+      setState(() { _retryAction = null; _retryStatus = null; });
+      if (delete) {
+        _showSnack('Laporan berhasil dihapus.');
         Navigator.pop(context);
       } else {
-        _showSnack(res['message'] ?? 'Gagal menghapus alert');
+        _showSnack('Status laporan berhasil diubah menjadi ${_statusLabel(status)}.');
+        await _load(silent: true);
       }
-    } catch (e) {
-      _showSnack('Error: $e');
-    }
-
-    if (mounted) {
-      setState(() => _actionLoading = false);
+    } catch (error) {
+      _failedAction(delete ? _DetailAction.delete : _DetailAction.status, status,
+        _failureMessage(error, delete ? 'Laporan belum berhasil dihapus. Silakan coba lagi.' : 'Status belum berhasil diperbarui. Silakan coba lagi.'));
+    } finally {
+      if (mounted) setState(() { _confirming = false; _actionLoading = false; });
     }
   }
 
-  Future<bool?> _confirmDialog({
-    required String title,
-    required String message,
-    required String actionText,
-    required bool danger,
-  }) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: NexusGuard.panel,
-          title: Text(
-            title,
-            style: NexusGuard.orbitron(
-              size: 16,
-              color: danger ? NexusGuard.red : NexusGuard.cyan,
-            ),
-          ),
-          content: Text(
-            message,
-            style: NexusGuard.rajdhani(color: NexusGuard.muted),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(
-                'BATAL',
-                style: NexusGuard.mono(color: NexusGuard.muted),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: danger ? NexusGuard.red : NexusGuard.cyan,
-                foregroundColor: danger ? Colors.white : NexusGuard.bg,
-              ),
-              child: Text(actionText),
-            ),
-          ],
-        );
-      },
-    );
+  Future<bool?> _confirmDialog({required bool delete, String? status}) {
+    return showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      key: const ValueKey('detail-confirm-dialog'),
+      title: Text(delete ? 'Hapus laporan?' : 'Ubah status laporan?'),
+      content: Text(delete
+        ? 'Laporan, respons warga, dan analisis AI terkait akan dihapus. Tindakan ini tidak dapat dibatalkan.'
+        : 'Ubah status laporan menjadi ${_statusLabel(status)}?'),
+      actions: [
+        TextButton(key: const ValueKey('detail-confirm-cancel'), onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+        FilledButton(
+          key: ValueKey(delete ? 'detail-confirm-delete' : 'detail-confirm-status'),
+          style: FilledButton.styleFrom(backgroundColor: delete ? NexusGuard.red : NexusGuard.emerald),
+          onPressed: () => Navigator.pop(context, true), child: Text(delete ? 'Hapus laporan' : 'Ubah status'),
+        ),
+      ],
+    ));
+  }
+
+  void _retryFailedAction() {
+    final action = _retryAction;
+    if (_busy || action == null) return;
+    switch (action) {
+      case _DetailAction.response:
+        if (_retryStatus != null) _respond(_retryStatus!);
+      case _DetailAction.status:
+        if (_retryStatus != null) _updateStatus(_retryStatus!);
+      case _DetailAction.delete:
+        _deleteAlert();
+    }
   }
 
   void _showSnack(String message) {
     if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: NexusGuard.panel,
-        content: Text(message, style: NexusGuard.rajdhani()),
-      ),
-    );
+  Map<String, dynamic>? get _latestAi {
+    final summaries = _alert?['aiSummaries'];
+    if (summaries is List && summaries.isNotEmpty && summaries.first is Map) {
+      return Map<String, dynamic>.from(summaries.first as Map);
+    }
+    return null;
+  }
+
+  String? get _risk => _latestAi?['riskLevel']?.toString() ?? _alert?['riskLevel']?.toString();
+
+  String _riskLabel(String? risk) {
+    switch (risk) {
+      case 'RENDAH': return 'Rendah';
+      case 'SEDANG': return 'Sedang';
+      case 'TINGGI': return 'Tinggi';
+      case 'KRITIS': return 'Kritis';
+      default: return 'Belum dinilai';
+    }
+  }
+
+  Color _riskColor(String? risk) {
+    switch (risk) {
+      case 'RENDAH': return NexusGuard.emerald;
+      case 'SEDANG': return NexusGuard.amber;
+      case 'TINGGI':
+      case 'KRITIS': return NexusGuard.red;
+      default: return NexusGuard.muted;
+    }
+  }
+
+  String _statusLabel(String? status) {
+    switch (status) {
+      case 'AKTIF': return 'Aktif';
+      case 'DIPROSES': return 'Diproses';
+      case 'SELESAI': return 'Selesai';
+      case 'DIBATALKAN': return 'Dibatalkan';
+      default: return 'Status belum tersedia';
+    }
+  }
+
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'AKTIF': return NexusGuard.red;
+      case 'DIPROSES': return NexusGuard.amber;
+      case 'SELESAI': return NexusGuard.emerald;
+      default: return NexusGuard.muted;
+    }
+  }
+
+  IconData _statusIcon(String? status) {
+    switch (status) {
+      case 'AKTIF': return Icons.notifications_active_outlined;
+      case 'DIPROSES': return Icons.pending_actions_rounded;
+      case 'SELESAI': return Icons.check_circle_outline_rounded;
+      case 'DIBATALKAN': return Icons.cancel_outlined;
+      default: return Icons.info_outline_rounded;
+    }
+  }
+
+  String _responseLabel(dynamic status) {
+    switch (status?.toString()) {
+      case 'SAYA_BISA_BANTU': return 'Bisa bantu';
+      case 'MENUJU_LOKASI': return 'Menuju lokasi';
+      case 'SUDAH_DI_LOKASI': return 'Sudah di lokasi';
+      default: return status?.toString().replaceAll('_', ' ') ?? 'Respons belum tersedia';
+    }
   }
 
   String _categoryName(Map<String, dynamic> alert) {
-    final custom = alert['customCategory'];
-
-    if (custom != null && custom.toString().trim().isNotEmpty) {
-      return custom.toString();
-    }
-
+    final custom = alert['customCategory']?.toString().trim() ?? '';
+    if (custom.isNotEmpty) return custom;
     final category = alert['category'];
-
-    if (category != null && category['name'] != null) {
-      return category['name'].toString();
-    }
-
-    return 'Alert Lingkungan';
+    return category is Map ? _value(category['name'], fallback: 'Laporan lingkungan') : 'Laporan lingkungan';
   }
 
-  String _riskLevel(Map<String, dynamic> alert) {
-    final aiSummaries = alert['aiSummaries'] as List? ?? [];
-
-    if (aiSummaries.isNotEmpty && aiSummaries.first['riskLevel'] != null) {
-      return aiSummaries.first['riskLevel'].toString();
-    }
-
-    return alert['riskLevel']?.toString() ?? '-';
+  String _value(dynamic value, {String fallback = 'Belum tersedia'}) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
   }
 
-  Color _riskColor(String risk) {
-    switch (risk) {
-      case 'RENDAH':
-        return NexusGuard.green;
-      case 'SEDANG':
-        return NexusGuard.amber;
-      case 'TINGGI':
-        return Colors.deepOrange;
-      case 'KRITIS':
-        return NexusGuard.red;
-      default:
-        return NexusGuard.cyan;
-    }
+  double? _coordinate(dynamic value, {required bool latitude}) {
+    final parsed = value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '');
+    final limit = latitude ? 90 : 180;
+    return parsed != null && parsed.isFinite && parsed >= -limit && parsed <= limit ? parsed : null;
   }
+
+  void _openMap() {
+    final alert = _alert;
+    if (alert == null) return;
+    final latitude = _coordinate(alert['latitude'], latitude: true);
+    final longitude = _coordinate(alert['longitude'], latitude: false);
+    if (latitude == null || longitude == null) return;
+    Navigator.push<void>(context, MaterialPageRoute(builder: (_) => MapScreen(
+      initialAlertId: widget.alertId, initialLatitude: latitude, initialLongitude: longitude,
+    )));
+  }
+
+  TextStyle _text({double size = 14, FontWeight weight = FontWeight.w400, Color? color, double height = 1.5}) =>
+    (Theme.of(context).textTheme.bodyMedium ?? const TextStyle()).copyWith(
+      fontSize: size, fontWeight: weight, color: color ?? NexusGuard.slate, height: height,
+    );
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        backgroundColor: NexusGuard.bg,
-        body: Center(
-          child: CircularProgressIndicator(color: NexusGuard.cyan),
-        ),
-      );
-    }
-
-    if (_alert == null) {
-      return Scaffold(
-        backgroundColor: NexusGuard.bg,
-        appBar: _appBar(),
-        body: Center(
-          child: Text(
-            'Data alert tidak ditemukan',
-            style: NexusGuard.rajdhani(),
-          ),
-        ),
-      );
-    }
-
-    final alert = _alert!;
-    final aiSummaries = alert['aiSummaries'] as List? ?? [];
-    final ai = aiSummaries.isNotEmpty ? aiSummaries.first : null;
-    final risk = _riskLevel(alert);
-    final riskColor = _riskColor(risk);
-
     return Scaffold(
-      backgroundColor: NexusGuard.bg,
-      appBar: _appBar(),
-      body: NexusBackground(
+      key: const ValueKey('detail-screen'),
+      backgroundColor: NexusGuard.slate,
+      appBar: AppBar(
+        title: Text('Detail Laporan', style: _text(size: 18, weight: FontWeight.w700, color: Colors.white)),
+        backgroundColor: NexusGuard.slate, foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent, centerTitle: true, elevation: 0,
+        actions: [IconButton(key: const ValueKey('detail-refresh'), tooltip: 'Perbarui detail',
+          onPressed: _busy ? null : () => _load(), icon: const Icon(Icons.refresh_rounded))],
+      ),
+      bottomNavigationBar: _alert != null && _isOwner ? _ownerActions() : null,
+      body: Container(
+        decoration: const BoxDecoration(color: NexusGuard.ivory,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        clipBehavior: Clip.antiAlias,
         child: RefreshIndicator(
-          onRefresh: _load,
-          color: NexusGuard.cyan,
-          backgroundColor: NexusGuard.panel,
+          onRefresh: () => _busy ? Future<void>.value() : _load(), color: NexusGuard.emerald,
           child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 96),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 900),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _hero(alert, risk, riskColor),
-                    const SizedBox(height: 14),
-                    if (_isOwner) _ownerCrudPanel(alert),
-                    if (_isOwner) const SizedBox(height: 14),
-                    _reporter(alert['user']),
-                    const SizedBox(height: 14),
-                    _coordinate(alert),
-                    const SizedBox(height: 14),
-                    if (ai != null) _aiAnalysis(ai, riskColor),
-                    const SizedBox(height: 14),
-                    _responsePanel(),
-                    const SizedBox(height: 14),
-                    _responders(alert),
-                  ],
-                ),
-              ),
-            ),
+            key: const ValueKey('detail-scroll'), physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+            child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 920),
+              child: _content())),
           ),
         ),
       ),
     );
   }
 
-  PreferredSizeWidget _appBar() {
-    return AppBar(
-      backgroundColor: NexusGuard.bg.withValues(alpha: 0.96),
-      elevation: 0,
-      foregroundColor: NexusGuard.text,
-      title: Text(
-        'INCIDENT DETAIL',
-        style: NexusGuard.orbitron(size: 16, color: NexusGuard.cyan),
-      ),
-    );
+  Widget _content() {
+    if (_loading) {
+      return _stateCard('detail-loading', 'Memuat detail laporan',
+        'Mengambil informasi kejadian terbaru.', loading: true);
+    }
+    if (_alert == null) {
+      return _stateCard('detail-error', 'Detail belum tersedia', _loadError ?? 'Laporan belum dapat dimuat.', retry: true);
+    }
+    final alert = _alert!;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (_loadError != null) ...[
+        _notice(key: 'detail-error', message: 'Pembaruan belum berhasil: $_loadError Data terakhir masih ditampilkan.',
+          retryKey: 'detail-retry', onRetry: _busy ? null : () => _load()),
+        const SizedBox(height: 14),
+      ],
+      if (_refreshing) const Padding(padding: EdgeInsets.only(bottom: 12),
+        child: LinearProgressIndicator(minHeight: 2, color: NexusGuard.emerald)),
+      _hero(alert),
+      const SizedBox(height: 16),
+      _aiSummary(),
+      const SizedBox(height: 12),
+      _aiAdvice(),
+      const SizedBox(height: 12),
+      _locationCard(alert),
+      const SizedBox(height: 16),
+      _reporterCard(alert),
+      const SizedBox(height: 16),
+      if (_actionError != null) ...[
+        _notice(key: 'detail-action-error', message: _actionError!, retryKey: 'detail-action-retry',
+          onRetry: _busy ? null : _retryFailedAction),
+        const SizedBox(height: 16),
+      ],
+      _responsePanel(),
+      const SizedBox(height: 16),
+      _responders(),
+      const SizedBox(height: 18),
+      Text('Detail diperbarui otomatis setiap 8 detik.', textAlign: TextAlign.center,
+        style: _text(size: 11, color: NexusGuard.muted)),
+    ]);
   }
 
-  Widget _hero(Map<String, dynamic> alert, String risk, Color riskColor) {
-    return NexusHudCard(
-      glowColor: riskColor,
-      active: true,
-      padding: const EdgeInsets.all(22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              NexusBadge(
-                text: alert['status']?.toString() ?? '-',
-                color: NexusGuard.red,
-                icon: Icons.warning_rounded,
-              ),
-              NexusBadge(text: 'RISK $risk', color: riskColor),
-              NexusBadge(text: _categoryName(alert), color: NexusGuard.cyan),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            alert['title']?.toString() ?? 'ALERT',
-            style: NexusGuard.orbitron(
-              size: 26,
-              color: NexusGuard.text,
-              weight: FontWeight.w900,
-              spacing: 1.1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            alert['description']?.toString() ?? '-',
-            style: NexusGuard.rajdhani(
-              size: 16,
-              color: NexusGuard.muted,
-            ),
-          ),
-        ],
-      ),
-    );
+  Widget _stateCard(String key, String title, String message, {bool loading = false, bool retry = false}) {
+    return _card(key: key, child: Padding(padding: const EdgeInsets.symmetric(vertical: 28),
+      child: Column(children: [
+        if (loading) const CircularProgressIndicator() else const Icon(Icons.cloud_off_outlined, size: 32, color: NexusGuard.muted),
+        const SizedBox(height: 16),
+        Text(title, textAlign: TextAlign.center, style: _text(size: 18, weight: FontWeight.w700)),
+        const SizedBox(height: 8), Text(message, textAlign: TextAlign.center, style: _text(color: NexusGuard.muted)),
+        if (retry) Padding(padding: const EdgeInsets.only(top: 12), child: OutlinedButton.icon(
+          key: const ValueKey('detail-retry'), onPressed: _busy ? null : () => _load(),
+          icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('Coba lagi'))),
+      ]),
+    ));
   }
 
-  Widget _ownerCrudPanel(Map<String, dynamic> alert) {
-    final status = alert['status']?.toString() ?? '-';
+  Widget _card({String? key, required Widget child, Color? color}) => Container(
+    key: key == null ? null : ValueKey(key), padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(color: color ?? NexusGuard.panel, borderRadius: BorderRadius.circular(17),
+      border: Border.all(color: NexusGuard.border)), child: child,
+  );
 
-    return NexusHudCard(
-      glowColor: NexusGuard.amber,
-      active: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const NexusSectionTitle(
-            title: 'CRUD CONTROL PELAPOR',
-            subtitle:
-                'Panel ini hanya muncul untuk akun pelapor. Warga lain tidak bisa update atau hapus.',
-            icon: Icons.admin_panel_settings_rounded,
-            color: NexusGuard.amber,
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Status sekarang: $status',
-            style: NexusGuard.rajdhani(
-              color: NexusGuard.text,
-              size: 16,
-              weight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _crudButton(
-                label: 'DIPROSES',
-                icon: Icons.sync_rounded,
-                color: NexusGuard.cyan,
-                onTap: _actionLoading ? null : () => _updateStatus('DIPROSES'),
-              ),
-              _crudButton(
-                label: 'SELESAI',
-                icon: Icons.check_circle_rounded,
-                color: NexusGuard.green,
-                onTap: _actionLoading ? null : () => _updateStatus('SELESAI'),
-              ),
-              _crudButton(
-                label: 'DIBATALKAN',
-                icon: Icons.cancel_rounded,
-                color: NexusGuard.amber,
-                onTap:
-                    _actionLoading ? null : () => _updateStatus('DIBATALKAN'),
-              ),
-              _crudButton(
-                label: 'HAPUS ALERT',
-                icon: Icons.delete_forever_rounded,
-                color: NexusGuard.red,
-                onTap: _actionLoading ? null : _deleteAlert,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  Widget _sectionTitle(String title, IconData icon) => Row(children: [
+    Icon(icon, size: 22, color: NexusGuard.emerald), const SizedBox(width: 10),
+    Expanded(child: Text(title, style: _text(size: 17, weight: FontWeight.w700))),
+  ]);
+
+  Widget _chip(String label, Color color, {IconData? icon}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(30)),
+    child: Text.rich(TextSpan(children: [
+      if (icon != null) WidgetSpan(alignment: PlaceholderAlignment.middle,
+        child: Padding(padding: const EdgeInsets.only(right: 5), child: Icon(icon, size: 14, color: color))),
+      TextSpan(text: label),
+    ]), style: _text(size: 12, weight: FontWeight.w600, color: color)),
+  );
+
+  Widget _hero(Map<String, dynamic> alert) {
+    final status = alert['status']?.toString();
+    final photo = [alert['photoUrl'], alert['image']].map((value) => value?.toString().trim() ?? '')
+        .firstWhere((value) => value.isNotEmpty, orElse: () => '');
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        _chip(_statusLabel(status), _statusColor(status), icon: _statusIcon(status)),
+        const SizedBox(width: 10),
+        Expanded(child: Tooltip(message: 'ID: ${widget.alertId}', child: Text('ID: ${widget.alertId}',
+          textAlign: TextAlign.end, maxLines: 1, overflow: TextOverflow.ellipsis, style: _text(size: 10, color: NexusGuard.muted)))),
+      ]),
+      if (photo.isNotEmpty) ...[
+        const SizedBox(height: 15),
+        ClipRRect(borderRadius: BorderRadius.circular(16), child: SizedBox(
+          key: const ValueKey('detail-photo'), width: double.infinity,
+          height: MediaQuery.sizeOf(context).width >= 800 ? 320 : 185, child: _photo(photo))),
+      ],
+      const SizedBox(height: 16),
+      Text(_value(alert['title'], fallback: 'Laporan lingkungan'), key: const ValueKey('detail-title'),
+        style: _text(size: 23, weight: FontWeight.w800, height: 1.3)),
+      const SizedBox(height: 12),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        _chip(_categoryName(alert), NexusGuard.emerald, icon: Icons.category_outlined),
+        _chip('Risiko: ${_riskLabel(_risk)}', _riskColor(_risk), icon: Icons.shield_outlined),
+      ]),
+      const SizedBox(height: 14),
+      Text(_value(alert['description'], fallback: 'Deskripsi belum tersedia.'), style: _text(color: NexusGuard.muted)),
+    ]);
   }
 
-  Widget _crudButton({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback? onTap,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onTap,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color.withValues(alpha: 0.16),
-        foregroundColor: color,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: color.withValues(alpha: 0.55)),
+  Widget _photo(String source) {
+    Widget unavailable() => ColoredBox(color: const Color(0xFFE8EFE9), child: Center(child: Column(
+      mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.broken_image_outlined, size: 30, color: NexusGuard.muted),
+        const SizedBox(height: 8), Text('Foto tidak dapat ditampilkan', style: _text(size: 12, color: NexusGuard.muted)),
+      ],
+    )));
+    try {
+      if (source.startsWith('data:image/')) {
+        final bytes = Uri.parse(source).data?.contentAsBytes();
+        if (bytes != null) return Image.memory(bytes, fit: BoxFit.cover, errorBuilder: (_, __, ___) => unavailable());
+      } else if (source.startsWith('http://') || source.startsWith('https://')) {
+        return Image.network(source, fit: BoxFit.cover, errorBuilder: (_, __, ___) => unavailable());
+      }
+    } catch (_) { return unavailable(); }
+    return unavailable();
+  }
+
+  Widget _aiSummary() {
+    final summary = _latestAi?['summary'] ?? _alert?['aiSummary'];
+    return _card(key: 'detail-ai-summary', child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionTitle('Analisis AI', Icons.smart_toy_outlined), const SizedBox(height: 10),
+      Text(_value(summary, fallback: 'Analisis AI belum tersedia untuk laporan ini.'), style: _text()),
+    ]));
+  }
+
+  Widget _aiAdvice() => _card(key: 'detail-ai-advice', color: const Color(0xFFE9F3E8),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionTitle('Saran Tindakan', Icons.verified_user_outlined), const SizedBox(height: 10),
+      Text(_value(_latestAi?['recommendedAction'], fallback: 'Saran tindakan AI belum tersedia.'), style: _text()),
+    ]),
+  );
+
+  Widget _locationCard(Map<String, dynamic> alert) {
+    final validCoordinates = _coordinate(alert['latitude'], latitude: true) != null &&
+        _coordinate(alert['longitude'], latitude: false) != null;
+    return Material(color: NexusGuard.panel, shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(17), side: const BorderSide(color: NexusGuard.border)),
+      child: InkWell(key: const ValueKey('detail-location'), onTap: validCoordinates ? _openMap : null,
+        borderRadius: BorderRadius.circular(17), child: Padding(padding: const EdgeInsets.all(16),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.location_on_outlined, color: NexusGuard.emerald), const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Lokasi Kejadian', style: _text(size: 16, weight: FontWeight.w700)), const SizedBox(height: 5),
+              Text(_value(alert['address'], fallback: 'Alamat belum tersedia'), style: _text(size: 12)),
+              const SizedBox(height: 5),
+              Text(validCoordinates ? '${alert['latitude']}, ${alert['longitude']}' : 'Koordinat belum tersedia',
+                style: _text(size: 11, color: NexusGuard.muted)),
+            ])),
+            if (validCoordinates) const Icon(Icons.chevron_right_rounded, color: NexusGuard.emerald),
+          ]),
         ),
       ),
-      icon: Icon(icon, size: 18),
-      label: Text(label, style: NexusGuard.mono(color: color)),
     );
   }
 
-  Widget _reporter(dynamic user) {
-    return NexusHudCard(
-      glowColor: NexusGuard.cyan,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const NexusSectionTitle(
-            title: 'PELAPOR ALERT',
-            subtitle: 'Identitas warga yang mengirim laporan',
-            icon: Icons.person_pin_circle_rounded,
-            color: NexusGuard.cyan,
-          ),
-          const SizedBox(height: 14),
-          _info('Nama', user?['name']?.toString() ?? '-'),
-          _info('Role', user?['role']?.toString() ?? '-'),
-          _info('No. HP', user?['phone']?.toString() ?? '-'),
-          _info('Alamat', user?['address']?.toString() ?? '-'),
-        ],
-      ),
-    );
-  }
-
-  Widget _coordinate(Map<String, dynamic> alert) {
-    return NexusHudCard(
-      glowColor: NexusGuard.green,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const NexusSectionTitle(
-            title: 'OPENSTREETMAP COORDINATE',
-            subtitle: 'Titik kejadian untuk ditampilkan pada peta',
-            icon: Icons.map_rounded,
-            color: NexusGuard.green,
-          ),
-          const SizedBox(height: 14),
-          _info('Latitude', alert['latitude']?.toString() ?? '-'),
-          _info('Longitude', alert['longitude']?.toString() ?? '-'),
-          _info('Alamat', alert['address']?.toString() ?? '-'),
-        ],
-      ),
-    );
-  }
-
-  Widget _aiAnalysis(dynamic ai, Color riskColor) {
-    return NexusHudCard(
-      glowColor: NexusGuard.purple,
-      active: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const NexusSectionTitle(
-            title: 'AI EMERGENCY ANALYSIS',
-            subtitle: 'Ringkasan, tingkat risiko, dan panduan awal',
-            icon: Icons.auto_awesome_rounded,
-            color: NexusGuard.purple,
-          ),
-          const SizedBox(height: 14),
-          NexusBadge(
-            text: ai['riskLevel']?.toString() ?? '-',
-            color: riskColor,
-            icon: Icons.speed_rounded,
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'RINGKASAN',
-            style: NexusGuard.mono(color: NexusGuard.cyan),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            ai['summary']?.toString() ?? '-',
-            style: NexusGuard.rajdhani(size: 16, color: NexusGuard.text),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'PANDUAN AWAL',
-            style: NexusGuard.mono(color: NexusGuard.green),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            ai['recommendedAction']?.toString() ?? '-',
-            style: NexusGuard.rajdhani(size: 16, color: NexusGuard.muted),
-          ),
-        ],
-      ),
-    );
+  Widget _reporterCard(Map<String, dynamic> alert) {
+    final reporter = alert['user'] is Map ? alert['user'] as Map : <String, dynamic>{};
+    return _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionTitle('Pelapor', Icons.person_outline_rounded), const SizedBox(height: 14),
+      _info('Nama', reporter['name']), _info('Peran', reporter['role']),
+      _info('Telepon', reporter['phone']), _info('Alamat', reporter['address']),
+    ]));
   }
 
   Widget _responsePanel() {
-    return NexusHudCard(
-      glowColor: NexusGuard.red,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const NexusSectionTitle(
-            title: 'RESPON ALERT',
-            subtitle: 'Respons kamu akan terlihat oleh pelapor agar tidak panik',
-            icon: Icons.groups_rounded,
-            color: NexusGuard.red,
+    final latest = _latestOwnResponse;
+    final currentId = _id(_currentUser?['id']);
+    return _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionTitle('Respons Anda', Icons.volunteer_activism_outlined), const SizedBox(height: 10),
+      Text('Beri tahu pelapor bila Anda dapat membantu. Perubahan status Anda ditambahkan ke riwayat respons.',
+        style: _text(size: 12, color: NexusGuard.muted)),
+      if (latest != null) Padding(padding: const EdgeInsets.only(top: 12),
+        child: Text('Respons terbaru Anda: ${_responseLabel(latest['responseStatus'])}',
+          key: const ValueKey('detail-my-response'), style: _text(size: 13, weight: FontWeight.w700, color: NexusGuard.emerald))),
+      const SizedBox(height: 14),
+      if (currentId == null) Text('Akun Anda belum tersedia. Muat ulang detail untuk merespons.', style: _text(color: NexusGuard.muted))
+      else ...[
+        TextField(key: const ValueKey('detail-response-note'), controller: _responseNote,
+          enabled: !_busy && _canInteract, minLines: 1, maxLines: 3,
+          decoration: const InputDecoration(labelText: 'Catatan (opsional)', hintText: 'Informasi bantuan yang dapat Anda berikan')),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final status in _responseStatuses) OutlinedButton(
+            key: ValueKey('detail-response-$status'), onPressed: _busy || !_canInteract ? null : () => _respond(status),
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              backgroundColor: latest?['responseStatus'] == status ? NexusGuard.emerald.withValues(alpha: 0.08) : null),
+            child: Text(_responseLabel(status), style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _responseButton(
-                'SAYA_BISA_BANTU',
-                'BISA BANTU',
-                Icons.volunteer_activism_rounded,
-              ),
-              _responseButton(
-                'MENUJU_LOKASI',
-                'MENUJU LOKASI',
-                Icons.directions_run_rounded,
-              ),
-              _responseButton(
-                'SUDAH_DI_LOKASI',
-                'SUDAH DI LOKASI',
-                Icons.check_circle_rounded,
-              ),
-            ],
-          ),
-        ],
-      ),
+        ]),
+      ],
+      if (_actionLoading) const Padding(padding: EdgeInsets.only(top: 14), child: LinearProgressIndicator(
+        key: ValueKey('detail-action-loading'), minHeight: 3, color: NexusGuard.emerald)),
+    ]));
+  }
+
+  Widget _responders() {
+    final responses = _responses;
+    return _card(key: 'detail-responders', child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionTitle('Riwayat Respons (${responses.length})', Icons.people_outline_rounded),
+      const SizedBox(height: 12),
+      if (responses.isEmpty) Text('Belum ada warga yang merespons laporan ini.', style: _text(color: NexusGuard.muted))
+      else for (final response in responses) Padding(padding: const EdgeInsets.only(bottom: 10),
+        child: _responseRow(response)),
+    ]));
+  }
+
+  Widget _responseRow(Map<String, dynamic> response) {
+    final user = response['user'] is Map ? response['user'] as Map : <String, dynamic>{};
+    final own = _belongsToCurrentUser(response);
+    final note = response['note']?.toString().trim() ?? '';
+    return Container(key: ValueKey('detail-response-row-${response['id']}'), padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: NexusGuard.ivory, borderRadius: BorderRadius.circular(13)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${_value(user['name'], fallback: 'Warga')}${own ? ' (Anda)' : ''}',
+          style: _text(weight: FontWeight.w700)), const SizedBox(height: 6),
+        _chip(_responseLabel(response['responseStatus']), NexusGuard.emerald), const SizedBox(height: 9),
+        _info('Peran', user['role']), _info('Telepon', user['phone']),
+        if (_value(user['address'], fallback: '').isNotEmpty) _info('Alamat', user['address']),
+        if (note.isNotEmpty) _info('Catatan', note),
+      ]),
     );
   }
 
-  Widget _responders(Map<String, dynamic> alert) {
-    final responses = alert['responses'] as List? ?? [];
+  Widget _info(String label, dynamic value) => Padding(padding: const EdgeInsets.only(bottom: 6),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(width: 75, child: Text(label, style: _text(size: 12, color: NexusGuard.muted))),
+      const SizedBox(width: 8), Expanded(child: Text(_value(value), style: _text(size: 12))),
+    ]),
+  );
 
-    return NexusHudCard(
-      glowColor: NexusGuard.cyan,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const NexusSectionTitle(
-            title: 'RESPONDER NETWORK',
-            subtitle: 'Warga yang sudah merespons alert ini',
-            icon: Icons.people_alt_rounded,
-            color: NexusGuard.cyan,
-          ),
-          const SizedBox(height: 14),
-          if (responses.isEmpty)
-            Text(
-              'Belum ada warga yang merespons alert ini.',
-              style: NexusGuard.rajdhani(color: NexusGuard.muted),
-            )
-          else
-            ...responses.map((response) {
-              final user = response['user'];
-              final status =
-                  response['responseStatus']?.toString().replaceAll('_', ' ') ??
-                      '-';
+  Widget _notice({required String key, required String message, required String retryKey, required VoidCallback? onRetry}) =>
+    _card(key: key, color: const Color(0xFFFFF4E3), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(message, style: _text(size: 13)), const SizedBox(height: 8),
+      TextButton.icon(key: ValueKey(retryKey), onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 18),
+        label: const Text('Coba lagi')),
+    ]));
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: NexusGuard.bg.withValues(alpha: 0.56),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: NexusGuard.cyan.withValues(alpha: 0.16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const CircleAvatar(
-                      backgroundColor: Color(0x2214B8A6),
-                      child: Icon(Icons.person_rounded, color: NexusGuard.cyan),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user?['name']?.toString() ?? 'Warga',
-                            style: NexusGuard.rajdhani(
-                              size: 17,
-                              color: NexusGuard.text,
-                              weight: FontWeight.w800,
-                            ),
-                          ),
-                          Text(
-                            '${user?['role'] ?? '-'} • HP: ${user?['phone'] ?? '-'}',
-                            style: NexusGuard.mono(size: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                    NexusBadge(text: status, color: NexusGuard.green),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
-    );
-  }
+  Widget _ownerActions() => Material(color: NexusGuard.panel, elevation: 4,
+    child: SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Center(heightFactor: 1, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 920),
+        child: Row(key: const ValueKey('detail-owner-actions'), children: [
+          Expanded(child: OutlinedButton(key: const ValueKey('detail-update-status'),
+            onPressed: _busy || !_canInteract ? null : _selectStatus,
+            style: OutlinedButton.styleFrom(side: const BorderSide(color: NexusGuard.emerald),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13)),
+            child: Text('Ubah status', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)))),
+          const SizedBox(width: 12),
+          Expanded(child: FilledButton(key: const ValueKey('detail-delete-alert'),
+            onPressed: _busy || !_canInteract ? null : _deleteAlert,
+            style: FilledButton.styleFrom(backgroundColor: NexusGuard.red,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13)),
+            child: Text('Hapus', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)))),
+        ]),
+      )),
+    )),
+  );
+}
 
-  Widget _responseButton(String status, String label, IconData icon) {
-    return ElevatedButton.icon(
-      onPressed: () => _respond(status),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: NexusGuard.red.withValues(alpha: 0.88),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: NexusGuard.red.withValues(alpha: 0.65)),
-        ),
-      ),
-      icon: Icon(icon, size: 18),
-      label: Text(label, style: NexusGuard.mono(color: Colors.white)),
-    );
-  }
-
-  Widget _info(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 118,
-            child: Text(
-              label.toUpperCase(),
-              style: NexusGuard.mono(size: 12, color: NexusGuard.muted2),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: NexusGuard.rajdhani(
-                size: 16,
-                color: NexusGuard.text,
-                weight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+class _DetailFailure implements Exception {
+  final String message;
+  const _DetailFailure(this.message);
 }
