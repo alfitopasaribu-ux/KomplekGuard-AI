@@ -1,199 +1,277 @@
-﻿import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+/// Shared visual language. Legacy names remain available to existing screens.
 class NexusGuard {
-  static const Color bg = Color(0xFF020617);
-  static const Color bg2 = Color(0xFF050B1A);
-  static const Color panel = Color(0xFF0F172A);
-  static const Color border = Color(0xFF1E293B);
+  static const emerald = Color(0xFF18776A);
+  static const slate = Color(0xFF172D36);
+  static const ivory = Color(0xFFF5F6F2);
+  static const red = Color(0xFFC54648);
+  static const amber = Color(0xFFD49A43);
+  static const success = Color(0xFF27A77D);
 
-  static const Color cyan = Color(0xFF22D3EE);
-  static const Color cyan2 = Color(0xFF00F5FF);
-  static const Color red = Color(0xFFEF4444);
-  static const Color green = Color(0xFF22C55E);
-  static const Color purple = Color(0xFFA855F7);
-  static const Color amber = Color(0xFFF59E0B);
+  static const bg = ivory;
+  static const bg2 = Color(0xFFEDF3EE);
+  static const panel = Colors.white;
+  static const border = Color(0xFFDFE7E1);
+  static const text = slate;
+  static const muted = Color(0xFF617178);
+  static const muted2 = Color(0xFF77858A);
 
-  static const Color text = Color(0xFFF8FAFC);
-  static const Color muted = Color(0xFF94A3B8);
-  static const Color muted2 = Color(0xFF64748B);
+  // Compatibility with screens outside this UI phase.
+  static const cyan = emerald;
+  static const cyan2 = emerald;
+  static const green = success;
+  static const purple = Color(0xFF397E74);
 
+  static ThemeData get theme {
+    final colors = ColorScheme.fromSeed(
+      seedColor: emerald,
+      brightness: Brightness.light,
+    ).copyWith(
+      primary: emerald,
+      onPrimary: Colors.white,
+      secondary: slate,
+      onSecondary: Colors.white,
+      tertiary: success,
+      error: red,
+      onError: Colors.white,
+      surface: panel,
+      onSurface: slate,
+      onSurfaceVariant: muted,
+      outline: border,
+    );
+    final base = ThemeData(
+      useMaterial3: true,
+      colorScheme: colors,
+      scaffoldBackgroundColor: ivory,
+      visualDensity: VisualDensity.standard,
+    );
+    final typography = base.textTheme.apply(
+      bodyColor: slate,
+      displayColor: slate,
+    );
+    final rounded = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    );
+
+    return base.copyWith(
+      textTheme: typography.copyWith(
+        headlineLarge: typography.headlineLarge?.copyWith(
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -1,
+          height: 1.2,
+        ),
+        headlineMedium: typography.headlineMedium?.copyWith(
+          fontSize: 28,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.7,
+          height: 1.25,
+        ),
+        titleLarge: typography.titleLarge?.copyWith(
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.4,
+        ),
+        titleMedium: typography.titleMedium?.copyWith(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+        ),
+        bodyLarge: typography.bodyLarge?.copyWith(fontSize: 16, height: 1.5),
+        bodyMedium: typography.bodyMedium?.copyWith(fontSize: 14, height: 1.5),
+        bodySmall: typography.bodySmall?.copyWith(
+          fontSize: 12,
+          height: 1.4,
+          color: muted,
+        ),
+        labelLarge: typography.labelLarge?.copyWith(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+      ),
+      appBarTheme: const AppBarThemeData(
+        backgroundColor: panel,
+        foregroundColor: slate,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          color: slate,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: panel,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: rounded.copyWith(side: const BorderSide(color: border)),
+      ),
+      inputDecorationTheme: InputDecorationThemeData(
+        filled: true,
+        fillColor: panel,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+        labelStyle: const TextStyle(color: muted, fontSize: 14),
+        hintStyle: const TextStyle(color: muted2, fontSize: 14),
+        errorMaxLines: 3,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: emerald, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: red),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: red, width: 1.5),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: emerald,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: const Color(0xFFDCE8E2),
+          disabledForegroundColor: muted,
+          minimumSize: const Size(48, 54),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+          textStyle: typography.labelLarge?.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+          shape: rounded,
+          elevation: 0,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: emerald,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(48, 54),
+          textStyle: typography.labelLarge?.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+          shape: rounded,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: emerald,
+          minimumSize: const Size(48, 48),
+          side: const BorderSide(color: border),
+          shape: rounded,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: emerald,
+          textStyle: typography.labelLarge?.copyWith(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+          minimumSize: const Size(48, 48),
+        ),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(color: emerald),
+      dividerTheme: const DividerThemeData(color: border, thickness: 1),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: slate,
+        contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: ivory,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+      ),
+      navigationBarTheme: const NavigationBarThemeData(
+        backgroundColor: panel,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: Color(0xFFE4F1EB),
+        elevation: 0,
+      ),
+    );
+  }
+
+  // These public helpers keep existing feature screens source-compatible.
   static TextStyle orbitron({
     double size = 16,
     Color color = text,
     FontWeight weight = FontWeight.w700,
-    double spacing = 0.8,
-  }) {
-    return GoogleFonts.orbitron(
-      fontSize: size,
-      color: color,
-      fontWeight: weight,
-      letterSpacing: spacing,
-    );
-  }
+    double spacing = 0,
+  }) =>
+      TextStyle(
+        fontSize: size,
+        color: color,
+        fontWeight: weight,
+        letterSpacing: spacing.clamp(-0.4, 0.6).toDouble(),
+        height: 1.3,
+      );
 
   static TextStyle rajdhani({
     double size = 16,
     Color color = text,
-    FontWeight weight = FontWeight.w600,
-    double spacing = 0.2,
-  }) {
-    return GoogleFonts.rajdhani(
-      fontSize: size,
-      color: color,
-      fontWeight: weight,
-      letterSpacing: spacing,
-    );
-  }
+    FontWeight weight = FontWeight.w400,
+    double spacing = 0,
+  }) =>
+      TextStyle(
+        fontSize: size,
+        color: color,
+        fontWeight: weight,
+        letterSpacing: spacing,
+        height: 1.5,
+      );
 
   static TextStyle mono({
     double size = 13,
     Color color = muted,
     FontWeight weight = FontWeight.w500,
-  }) {
-    return GoogleFonts.shareTechMono(
-      fontSize: size,
-      color: color,
-      fontWeight: weight,
-    );
-  }
+  }) =>
+      TextStyle(fontSize: size, color: color, fontWeight: weight, height: 1.4);
 
   static BoxDecoration card({
     Color? glow,
     double radius = 22,
     bool active = false,
-  }) {
-    return BoxDecoration(
-      color: panel.withValues(alpha: 0.86),
-      borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: active
-            ? (glow ?? cyan).withValues(alpha: 0.55)
-            : border.withValues(alpha: 0.9),
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.45),
-          blurRadius: 24,
-          offset: const Offset(0, 12),
+  }) =>
+      BoxDecoration(
+        color: panel,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: active ? (glow ?? emerald).withValues(alpha: 0.35) : border,
         ),
-        if (glow != null)
+        boxShadow: [
           BoxShadow(
-            color: glow.withValues(alpha: active ? 0.25 : 0.12),
-            blurRadius: active ? 34 : 20,
-            spreadRadius: active ? 1 : 0,
+            color: slate.withValues(alpha: 0.045),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
           ),
-      ],
-    );
-  }
+        ],
+      );
 }
 
 class NexusBackground extends StatelessWidget {
   final Widget child;
 
-  const NexusBackground({
-    super.key,
-    required this.child,
-  });
+  const NexusBackground({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: NexusGuard.bg,
-      child: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-          const Positioned(
-            top: -90,
-            left: -80,
-            child: _GlowOrb(
-              color: NexusGuard.cyan,
-              size: 250,
-              opacity: 0.10,
-            ),
-          ),
-          const Positioned(
-            bottom: -120,
-            right: -90,
-            child: _GlowOrb(
-              color: NexusGuard.purple,
-              size: 310,
-              opacity: 0.12,
-            ),
-          ),
-          const Positioned(
-            top: 180,
-            right: 100,
-            child: _GlowOrb(
-              color: NexusGuard.red,
-              size: 170,
-              opacity: 0.06,
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _GlowOrb extends StatelessWidget {
-  final Color color;
-  final double size;
-  final double opacity;
-
-  const _GlowOrb({
-    required this.color,
-    required this.size,
-    required this.opacity,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: opacity),
-            blurRadius: size / 2,
-            spreadRadius: size / 5,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final dotPaint = Paint()
-      ..color = NexusGuard.cyan.withValues(alpha: 0.045)
-      ..strokeWidth = 1;
-
-    const gap = 26.0;
-
-    for (double x = 0; x < size.width; x += gap) {
-      for (double y = 0; y < size.height; y += gap) {
-        canvas.drawCircle(Offset(x, y), 0.7, dotPaint);
-      }
-    }
-
-    final linePaint = Paint()
-      ..color = NexusGuard.cyan.withValues(alpha: 0.025)
-      ..strokeWidth = 1;
-
-    for (double y = 0; y < size.height; y += 82) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) =>
+      ColoredBox(color: NexusGuard.bg, child: child);
 }
 
 class NexusHudCard extends StatefulWidget {
@@ -206,7 +284,7 @@ class NexusHudCard extends StatefulWidget {
   const NexusHudCard({
     super.key,
     required this.child,
-    this.glowColor = NexusGuard.cyan,
+    this.glowColor = NexusGuard.emerald,
     this.padding = const EdgeInsets.all(18),
     this.active = false,
     this.onTap,
@@ -221,82 +299,27 @@ class _NexusHudCardState extends State<NexusHudCard> {
 
   @override
   Widget build(BuildContext context) {
-    final card = AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOut,
-      padding: widget.padding,
-      decoration: NexusGuard.card(
-        glow: widget.glowColor,
-        active: widget.active || _hover,
-      ),
-      transform: Matrix4.identity()
-        ..translateByDouble(0.0, _hover ? -3.0 : 0.0, 0.0, 1.0),
-      child: Stack(
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            child: _Corner(color: widget.glowColor),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Transform.rotate(
-              angle: pi,
-              child: _Corner(color: widget.glowColor),
-            ),
-          ),
-          widget.child,
-        ],
-      ),
-    );
-
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      child: widget.onTap == null
-          ? card
-          : InkWell(
-              onTap: widget.onTap,
-              borderRadius: BorderRadius.circular(22),
-              child: card,
-            ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: NexusGuard.card(
+          glow: widget.glowColor,
+          active: widget.active || _hover,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(22),
+            child: Padding(padding: widget.padding, child: widget.child),
+          ),
+        ),
+      ),
     );
   }
-}
-
-class _Corner extends StatelessWidget {
-  final Color color;
-
-  const _Corner({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(28, 28),
-      painter: _CornerPainter(color),
-    );
-  }
-}
-
-class _CornerPainter extends CustomPainter {
-  final Color color;
-
-  _CornerPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.85)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    canvas.drawLine(Offset.zero, Offset(size.width * 0.65, 0), paint);
-    canvas.drawLine(Offset.zero, Offset(0, size.height * 0.65), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class NexusBadge extends StatelessWidget {
@@ -304,42 +327,28 @@ class NexusBadge extends StatelessWidget {
   final Color color;
   final IconData? icon;
 
-  const NexusBadge({
-    super.key,
-    required this.text,
-    required this.color,
-    this.icon,
-  });
+  const NexusBadge(
+      {super.key, required this.text, required this.color, this.icon});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.11),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.10),
-            blurRadius: 16,
-          ),
-        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
             Icon(icon, color: color, size: 14),
-            const SizedBox(width: 6),
+            const SizedBox(width: 6)
           ],
-          Text(
-            text,
-            style: NexusGuard.mono(
-              color: color,
-              size: 12,
-              weight: FontWeight.w700,
-            ),
+          Flexible(
+            child: Text(text,
+                style: NexusGuard.mono(
+                    color: color, size: 12, weight: FontWeight.w600)),
           ),
         ],
       ),
@@ -358,7 +367,7 @@ class NexusSectionTitle extends StatelessWidget {
     required this.title,
     this.subtitle,
     required this.icon,
-    this.color = NexusGuard.cyan,
+    this.color = NexusGuard.emerald,
   });
 
   @override
@@ -371,15 +380,12 @@ class NexusSectionTitle extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: NexusGuard.orbitron(size: 16, color: color)),
+              Text(title,
+                  style: NexusGuard.orbitron(size: 18, color: NexusGuard.text)),
               if (subtitle != null)
-                Text(
-                  subtitle!,
-                  style: NexusGuard.rajdhani(
-                    size: 13,
-                    color: NexusGuard.muted,
-                  ),
-                ),
+                Text(subtitle!,
+                    style:
+                        NexusGuard.rajdhani(size: 13, color: NexusGuard.muted)),
             ],
           ),
         ),
@@ -406,28 +412,19 @@ class NexusPrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 64,
       child: ElevatedButton.icon(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: color.withValues(alpha: 0.90),
+          backgroundColor: color,
           foregroundColor: Colors.white,
-          elevation: 0,
-          shadowColor: color,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(color: color.withValues(alpha: 0.7)),
-          ),
+          minimumSize: const Size(48, 58),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
-        icon: Icon(icon, size: 24),
-        label: Text(
-          text,
-          style: NexusGuard.orbitron(
-            size: 15,
-            weight: FontWeight.w800,
-            spacing: 1.1,
-          ),
-        ),
+        icon: Icon(icon, size: 22),
+        label: Text(text,
+            textAlign: TextAlign.center,
+            style: NexusGuard.orbitron(size: 15, color: Colors.white)),
       ),
     );
   }

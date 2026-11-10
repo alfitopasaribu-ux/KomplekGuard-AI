@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/theme/nexus_guard_theme.dart';
 import 'screens/splash/splash_screen.dart';
 
 void main() {
@@ -13,13 +14,7 @@ class KomplekGuardApp extends StatelessWidget {
     return MaterialApp(
       title: 'KomplekGuard AI',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD32F2F),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
+      theme: NexusGuard.theme,
       home: const SplashScreen(),
     );
   }

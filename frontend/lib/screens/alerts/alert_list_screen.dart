@@ -67,11 +67,11 @@ class _AlertListScreenState extends State<AlertListScreen>
   Color _statusColor(String? status) {
     switch (status) {
       case 'AKTIF':
-        return const Color(0xFF00E5FF);
+        return NexusGuard.red;
       case 'DIPROSES':
-        return Colors.orange;
+        return NexusGuard.amber;
       case 'SELESAI':
-        return Colors.green;
+        return NexusGuard.green;
       case 'DIBATALKAN':
         return Colors.grey;
       default:
@@ -108,7 +108,7 @@ class _AlertListScreenState extends State<AlertListScreen>
               },
               leading: const Icon(
                 Icons.warning_rounded,
-                color: Color(0xFF00E5FF),
+                color: NexusGuard.red,
               ),
               title: Text(alert['title']?.toString() ?? ''),
               subtitle: Text(
@@ -135,7 +135,7 @@ class _AlertListScreenState extends State<AlertListScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Daftar Alert'),
-        backgroundColor: const Color(0xFF081021),
+        backgroundColor: NexusGuard.panel,
         foregroundColor: NexusGuard.text,
         bottom: TabBar(
           unselectedLabelColor: NexusGuard.muted,
@@ -160,6 +160,3 @@ class _AlertListScreenState extends State<AlertListScreen>
     );
   }
 }
-
-
-
