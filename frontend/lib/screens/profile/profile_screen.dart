@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -18,6 +16,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
+
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
@@ -25,7 +24,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _user;
   Uint8List? _imageBytes;
   String? _imageUrl;
-  String _imageMime = 'image/jpeg';
   bool _loading = true;
   bool _saving = false;
   bool _picking = false;
@@ -112,9 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _saveError = null;
     });
     try {
-      final image = _imageBytes == null
-          ? _imageUrl
-          : 'data:' + _imageMime + ';base64,' + base64Encode(_imageBytes!);
+      final image = _imageBytes == null ? _imageUrl : 'data:;base64,';
       final body = <String, dynamic>{
         'name': _nameCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
@@ -138,7 +134,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final token = await ApiService.getToken();
         if (token != null) await AuthService.saveToken(token, profile);
       } catch (_) {
-        cacheError = 'Profil tersimpan di server, tetapi data sesi lokal belum diperbarui.';
+        cacheError =
+            'Profil tersimpan di server, tetapi data sesi lokal belum diperbarui.';
       }
       if (!mounted) return;
       setState(() {
@@ -167,7 +164,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('Ganti foto profil', style: Theme.of(context).textTheme.titleLarge),
+            Text('Ganti foto profil',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             ListTile(
               key: const ValueKey('profile-photo-gallery'),
@@ -190,7 +188,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (kIsWeb)
               const Padding(
                 padding: EdgeInsets.all(8),
-                child: Text('Pilihan kamera mengikuti dukungan browser dan perangkat.'),
+                child: Text(
+                    'Pilihan kamera mengikuti dukungan browser dan perangkat.'),
               ),
           ]),
         ),
@@ -212,30 +211,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       if (file == null || !mounted) return;
       Uint8List bytes = await file.readAsBytes();
-      var mime = bytes.length > 3 && bytes[0] == 0x89 && bytes[1] == 0x50
-          ? 'image/png'
-          : 'image/jpeg';
       if (!kIsWeb) {
         bytes = await FlutterImageCompress.compressWithList(bytes,
-            minWidth: 400, minHeight: 400, quality: 75, format: CompressFormat.jpeg);
-        mime = 'image/jpeg';
+            minWidth: 400,
+            minHeight: 400,
+            quality: 75,
+            format: CompressFormat.jpeg);
       }
       if (!mounted) return;
       if (bytes.isEmpty || bytes.length > 2500000) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Pilih foto yang valid dengan ukuran maksimal 2,5 MB.')));
+            content:
+                Text('Pilih foto yang valid dengan ukuran maksimal 2,5 MB.')));
         return;
       }
       setState(() {
         _imageBytes = bytes;
-        _imageMime = mime;
         _imageUrl = null;
         _saved = false;
       });
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Foto belum dapat dipilih. Periksa izin kamera atau galeri.')));
+          content: Text(
+              'Foto belum dapat dipilih. Periksa izin kamera atau galeri.')));
     } finally {
       if (mounted) setState(() => _picking = false);
     }
@@ -262,11 +261,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   String get _role {
     switch (_user?['role']) {
-      case 'WARGA': return 'Warga';
-      case 'SATPAM': return 'Petugas keamanan';
-      case 'KETUA_RT': return 'Ketua RT';
-      case 'ADMIN': return 'Admin';
-      default: return 'Pengguna';
+      case 'WARGA':
+        return 'Warga';
+      case 'SATPAM':
+        return 'Petugas keamanan';
+      case 'KETUA_RT':
+        return 'Ketua RT';
+      case 'ADMIN':
+        return 'Admin';
+      default:
+        return 'Pengguna';
     }
   }
 
@@ -283,7 +287,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             key: const ValueKey('profile-save-top'),
             tooltip: 'Simpan perubahan profil',
-            onPressed: _loading || _saving || _picking || _user == null ? null : _save,
+            onPressed:
+                _loading || _saving || _picking || _user == null ? null : _save,
             icon: const Icon(Icons.save_outlined),
           ),
           const SizedBox(width: 8),
@@ -298,34 +303,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         clipBehavior: Clip.antiAlias,
         child: _loading
-            ? const Center(key: ValueKey('profile-loading'), child: CircularProgressIndicator())
+            ? const Center(
+                key: ValueKey('profile-loading'),
+                child: CircularProgressIndicator())
             : SingleChildScrollView(
                 key: const ValueKey('profile-scroll'),
                 padding: const EdgeInsets.fromLTRB(18, 22, 18, 32),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1000),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      if (_loadError != null) ...[
-                        _notice(_loadError!, keyName: 'profile-load-error', retry: true),
-                        const SizedBox(height: 16),
-                      ],
-                      if (_user != null)
-                        LayoutBuilder(builder: (context, constraints) {
-                          final summary = _identityCard();
-                          final form = _profileForm();
-                          if (constraints.maxWidth >= 800) {
-                            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Expanded(flex: 2, child: summary),
-                              const SizedBox(width: 22),
-                              Expanded(flex: 3, child: form),
-                            ]);
-                          }
-                          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                            summary, const SizedBox(height: 18), form,
-                          ]);
-                        }),
-                    ]),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_loadError != null) ...[
+                            _notice(_loadError!,
+                                keyName: 'profile-load-error', retry: true),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_user != null)
+                            LayoutBuilder(builder: (context, constraints) {
+                              final summary = _identityCard();
+                              final form = _profileForm();
+                              if (constraints.maxWidth >= 800) {
+                                return Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(flex: 2, child: summary),
+                                      const SizedBox(width: 22),
+                                      Expanded(flex: 3, child: form),
+                                    ]);
+                              }
+                              return Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    summary,
+                                    const SizedBox(height: 18),
+                                    form,
+                                  ]);
+                            }),
+                        ]),
                   ),
                 ),
               ),
@@ -334,28 +352,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   BoxDecoration get _card => BoxDecoration(
-    color: NexusGuard.panel,
-    borderRadius: BorderRadius.circular(21),
-    border: Border.all(color: NexusGuard.border),
-  );
+        color: NexusGuard.panel,
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: NexusGuard.border),
+      );
 
-  Widget _notice(String message, {required String keyName, bool retry = false}) {
-    return Semantics(liveRegion: true, child: Container(
-      key: ValueKey(keyName),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: NexusGuard.amber.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(message, style: Theme.of(context).textTheme.bodyMedium),
-        if (retry) TextButton.icon(
-          key: const ValueKey('profile-retry'),
-          onPressed: _saving || _picking ? null : _loadProfile,
-          icon: const Icon(Icons.refresh_rounded), label: const Text('Coba lagi'),
-        ),
-      ]),
-    ));
+  Widget _notice(String message,
+      {required String keyName, bool retry = false}) {
+    return Semantics(
+        liveRegion: true,
+        child: Container(
+          key: ValueKey(keyName),
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: NexusGuard.amber.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(message, style: Theme.of(context).textTheme.bodyMedium),
+            if (retry)
+              TextButton.icon(
+                key: const ValueKey('profile-retry'),
+                onPressed: _saving || _picking ? null : _loadProfile,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Coba lagi'),
+              ),
+          ]),
+        ));
   }
 
   Widget _identityCard() {
@@ -363,46 +387,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final name = _user?['name']?.toString().trim() ?? '';
     final email = _user?['email']?.toString().trim() ?? '';
     final neighborhood = _user?['neighborhood'];
-    final neighborhoodName = neighborhood is Map ? neighborhood['name']?.toString() : null;
+    final neighborhoodName =
+        neighborhood is Map ? neighborhood['name']?.toString() : null;
     return Container(
       key: const ValueKey('profile-identity'),
       padding: const EdgeInsets.all(22),
       decoration: _card,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Semantics(button: true, label: 'Ganti foto profil', child: InkWell(
-            key: const ValueKey('profile-photo'),
-            onTap: _saving || _picking ? null : _showSourcePicker,
-            borderRadius: BorderRadius.circular(48),
-            child: Stack(children: [
-              ClipOval(child: Container(
-                width: 82, height: 82, color: const Color(0xFFDCEDE5),
-                child: _picking
-                    ? const Center(child: CircularProgressIndicator())
-                    : provider == null
-                        ? const Icon(Icons.person_outline_rounded, size: 45, color: NexusGuard.emerald)
-                        : Image(image: provider, fit: BoxFit.cover, errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.person_outline_rounded, size: 45, color: NexusGuard.emerald)),
+          Semantics(
+              button: true,
+              label: 'Ganti foto profil',
+              child: InkWell(
+                key: const ValueKey('profile-photo'),
+                onTap: _saving || _picking ? null : _showSourcePicker,
+                borderRadius: BorderRadius.circular(48),
+                child: Stack(children: [
+                  ClipOval(
+                      child: Container(
+                    width: 82,
+                    height: 82,
+                    color: const Color(0xFFDCEDE5),
+                    child: _picking
+                        ? const Center(child: CircularProgressIndicator())
+                        : provider == null
+                            ? const Icon(Icons.person_outline_rounded,
+                                size: 45, color: NexusGuard.emerald)
+                            : Image(
+                                image: provider,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.person_outline_rounded,
+                                    size: 45,
+                                    color: NexusGuard.emerald)),
+                  )),
+                  const Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: NexusGuard.emerald,
+                        child: Icon(Icons.camera_alt_outlined,
+                            size: 16, color: Colors.white),
+                      )),
+                ]),
               )),
-              const Positioned(right: 0, bottom: 0, child: CircleAvatar(
-                radius: 14, backgroundColor: NexusGuard.emerald,
-                child: Icon(Icons.camera_alt_outlined, size: 16, color: Colors.white),
-              )),
-            ]),
-          )),
           const SizedBox(width: 16),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(name.isEmpty ? 'Nama belum diisi' : name,
-              key: const ValueKey('profile-display-name'),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Align(alignment: Alignment.centerLeft, child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(color: NexusGuard.emerald.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(18)),
-              child: Text(_role, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: NexusGuard.emerald)),
-            )),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(
+                  name.isEmpty ? 'Nama belum diisi' : name,
+                  key: const ValueKey('profile-display-name'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                          color: NexusGuard.emerald.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(18)),
+                      child: Text(_role,
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelMedium
+                              ?.copyWith(color: NexusGuard.emerald)),
+                    )),
+              ])),
         ]),
         const SizedBox(height: 18),
         TextButton.icon(
@@ -412,12 +467,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           label: Text(_picking ? 'Memproses foto...' : 'Ganti foto profil'),
         ),
         const Divider(height: 28),
-        _info(Icons.phone_outlined, _user?['phone']?.toString(), 'Nomor telepon belum diisi'),
+        _info(Icons.phone_outlined, _user?['phone']?.toString(),
+            'Nomor telepon belum diisi'),
         const SizedBox(height: 16),
-        _info(Icons.home_outlined, _user?['address']?.toString(), 'Alamat belum diisi'),
-        if (email.isNotEmpty) ...[const SizedBox(height: 16), _info(Icons.mail_outline_rounded, email, '')],
+        _info(Icons.home_outlined, _user?['address']?.toString(),
+            'Alamat belum diisi'),
+        if (email.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _info(Icons.mail_outline_rounded, email, '')
+        ],
         if (neighborhoodName != null && neighborhoodName.trim().isNotEmpty) ...[
-          const SizedBox(height: 16), _info(Icons.location_city_outlined, neighborhoodName, ''),
+          const SizedBox(height: 16),
+          _info(Icons.location_city_outlined, neighborhoodName, ''),
         ],
       ]),
     );
@@ -427,8 +488,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(icon, size: 20, color: NexusGuard.emerald),
       const SizedBox(width: 12),
-      Expanded(child: Text(value == null || value.trim().isEmpty ? fallback : value,
-        style: Theme.of(context).textTheme.bodyMedium)),
+      Expanded(
+          child: Text(value == null || value.trim().isEmpty ? fallback : value,
+              style: Theme.of(context).textTheme.bodyMedium)),
     ]);
   }
 
@@ -440,49 +502,90 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Form(
         key: _formKey,
         autovalidateMode: AutovalidateMode.onUserInteraction,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Informasi pribadi', style: Theme.of(context).textTheme.titleLarge),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Informasi pribadi',
+              style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 7),
-          Text('Perbarui informasi agar warga dapat menghubungi Anda.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: NexusGuard.muted)),
+          Text('Perbarui informasi agar warga dapat menghubungi Anda.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: NexusGuard.muted)),
           const SizedBox(height: 24),
           TextFormField(
-            key: const ValueKey('profile-name'), controller: _nameCtrl, enabled: !disabled,
-            textCapitalization: TextCapitalization.words, textInputAction: TextInputAction.next,
-            autofillHints: const [AutofillHints.name], onChanged: (_) => _changed(),
-            validator: (value) => value == null || value.trim().isEmpty ? 'Nama lengkap wajib diisi.' : null,
-            decoration: const InputDecoration(labelText: 'Nama lengkap', prefixIcon: Icon(Icons.person_outline_rounded)),
+            key: const ValueKey('profile-name'),
+            controller: _nameCtrl,
+            enabled: !disabled,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.name],
+            onChanged: (_) => _changed(),
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Nama lengkap wajib diisi.'
+                : null,
+            decoration: const InputDecoration(
+                labelText: 'Nama lengkap',
+                prefixIcon: Icon(Icons.person_outline_rounded)),
           ),
           const SizedBox(height: 20),
           TextFormField(
-            key: const ValueKey('profile-phone'), controller: _phoneCtrl, enabled: !disabled,
-            keyboardType: TextInputType.phone, textInputAction: TextInputAction.next,
-            autofillHints: const [AutofillHints.telephoneNumber], onChanged: (_) => _changed(),
-            decoration: const InputDecoration(labelText: 'Nomor telepon', helperText: 'Opsional', prefixIcon: Icon(Icons.phone_outlined)),
+            key: const ValueKey('profile-phone'),
+            controller: _phoneCtrl,
+            enabled: !disabled,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.telephoneNumber],
+            onChanged: (_) => _changed(),
+            decoration: const InputDecoration(
+                labelText: 'Nomor telepon',
+                helperText: 'Opsional',
+                prefixIcon: Icon(Icons.phone_outlined)),
           ),
           const SizedBox(height: 20),
           TextFormField(
-            key: const ValueKey('profile-address'), controller: _addressCtrl, enabled: !disabled,
-            maxLines: 3, keyboardType: TextInputType.streetAddress,
-            autofillHints: const [AutofillHints.streetAddress], onChanged: (_) => _changed(),
-            decoration: const InputDecoration(labelText: 'Alamat', helperText: 'Opsional', prefixIcon: Icon(Icons.home_outlined)),
+            key: const ValueKey('profile-address'),
+            controller: _addressCtrl,
+            enabled: !disabled,
+            maxLines: 3,
+            keyboardType: TextInputType.streetAddress,
+            autofillHints: const [AutofillHints.fullStreetAddress],
+            onChanged: (_) => _changed(),
+            decoration: const InputDecoration(
+                labelText: 'Alamat',
+                helperText: 'Opsional',
+                prefixIcon: Icon(Icons.home_outlined)),
           ),
           const SizedBox(height: 24),
           if (_saveError != null) ...[
-            _notice(_saveError!, keyName: 'profile-save-error'), const SizedBox(height: 16),
+            _notice(_saveError!, keyName: 'profile-save-error'),
+            const SizedBox(height: 16),
           ],
           if (_saved) ...[
-            Semantics(liveRegion: true, child: Row(key: const ValueKey('profile-saved'), children: [
-              const Icon(Icons.check_circle_outline_rounded, color: NexusGuard.emerald),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Profil berhasil disimpan.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: NexusGuard.emerald))),
-            ])),
+            Semantics(
+                liveRegion: true,
+                child: Row(key: const ValueKey('profile-saved'), children: [
+                  const Icon(Icons.check_circle_outline_rounded,
+                      color: NexusGuard.emerald),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Text('Profil berhasil disimpan.',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: NexusGuard.emerald))),
+                ])),
             const SizedBox(height: 16),
           ],
           ElevatedButton.icon(
             key: const ValueKey('profile-save'),
             onPressed: disabled ? null : _save,
             icon: _saving
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.check_rounded, size: 20),
             label: Text(_saving ? 'Menyimpan...' : 'Simpan perubahan'),
           ),

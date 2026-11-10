@@ -1,4 +1,4 @@
-﻿import 'api_service.dart';
+import 'api_service.dart';
 
 class AlertService {
   static Future<Map<String, dynamic>> getAlerts() async {
@@ -13,7 +13,8 @@ class AlertService {
     return await ApiService.get('/alerts/history');
   }
 
-  static Future<Map<String, dynamic>> createAlert(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> createAlert(
+      Map<String, dynamic> data) async {
     return await ApiService.post('/alerts', data);
   }
 

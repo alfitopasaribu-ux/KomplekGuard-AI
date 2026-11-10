@@ -43,13 +43,12 @@ class VoiceService {
           onDone?.call();
         }
       },
-     listenOptions: SpeechListenOptions(
-  
-  listenMode: ListenMode.dictation,
-  partialResults: false,
-  listenFor: const Duration(seconds: 60),
-  pauseFor: const Duration(seconds: 6),
-),
+      listenOptions: SpeechListenOptions(
+        listenMode: ListenMode.dictation,
+        partialResults: false,
+        listenFor: const Duration(seconds: 60),
+        pauseFor: const Duration(seconds: 6),
+      ),
     );
   }
 
@@ -65,4 +64,3 @@ class VoiceService {
     }
   }
 }
-

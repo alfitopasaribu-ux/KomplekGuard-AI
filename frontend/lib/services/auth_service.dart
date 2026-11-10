@@ -4,11 +4,14 @@ import '../core/constants/app_constants.dart';
 import 'api_service.dart';
 
 class AuthService {
-  static Future<Map<String, dynamic>> login(String email, String password) async {
-    return await ApiService.post('/auth/login', {'email': email, 'password': password});
+  static Future<Map<String, dynamic>> login(
+      String email, String password) async {
+    return await ApiService.post(
+        '/auth/login', {'email': email, 'password': password});
   }
 
-  static Future<Map<String, dynamic>> register(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> register(
+      Map<String, dynamic> data) async {
     return await ApiService.post('/auth/register', data);
   }
 

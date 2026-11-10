@@ -1,4 +1,4 @@
-﻿class AppConstants {
+class AppConstants {
   static const String appName = 'KomplekGuard AI';
 
   // BACKEND VERCEL URL

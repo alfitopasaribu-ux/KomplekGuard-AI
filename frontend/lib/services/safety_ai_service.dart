@@ -1,4 +1,4 @@
-﻿import 'api_service.dart';
+import 'api_service.dart';
 
 class SafetyAiService {
   static Future<Map<String, dynamic>> getDailyBriefing() async {
