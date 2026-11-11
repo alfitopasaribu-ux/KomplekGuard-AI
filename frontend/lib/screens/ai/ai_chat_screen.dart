@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/nexus_guard_theme.dart';
 import '../../services/safety_ai_service.dart';
 import '../../services/voice_service.dart';
+import '../../services/safety_quick_guide.dart';
+import '../../widgets/safety_response_text.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -154,6 +156,84 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _sendMessage();
   }
 
+  void _openQuickGuides() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFFF9FBF7),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Panduan Kilat Keselamatan',
+                  style: TextStyle(fontWeight: FontWeight.w800,
+                      color: NexusGuard.slate, fontSize: 20)),
+              const SizedBox(height: 8),
+              const Text(
+                'Tidak memakai token AI. Pilih panduan untuk langkah awal; '
+                'bukan informasi kondisi komplek secara langsung.',
+                style: TextStyle(color: NexusGuard.muted, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: SafetyQuickGuide.guides.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 5),
+                  itemBuilder: (_, index) {
+                    final guide = SafetyQuickGuide.guides[index];
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      leading: const Icon(Icons.health_and_safety_outlined,
+                          color: NexusGuard.emerald),
+                      title: Text(guide.title,
+                          style: const TextStyle(
+                              color: NexusGuard.slate,
+                              fontWeight: FontWeight.w700)),
+                      trailing: const Icon(Icons.chevron_right,
+                          color: NexusGuard.emerald),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _showGuide(guide);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showGuide(SafetyQuickGuide guide) {
+    final content = [
+      guide.subtitle,
+      '',
+      for (var i = 0; i < guide.steps.length; i++)
+        '${i + 1}. ${guide.steps[i]}',
+      '',
+      'Jika ada bahaya langsung, utamakan evakuasi dan hubungi petugas. '
+          'Panduan ini bukan analisis AI atau laporan real-time.',
+    ].join('\n');
+
+    setState(() {
+      _messages.add({
+        'role': 'ASSISTANT',
+        'message': content,
+        'offlineGuide': true,
+      });
+    });
+    _scrollToBottom();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,6 +258,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             child: Column(
               children: [
                 _header(),
+                _quickGuideBar(),
                 _quickQuestions(),
                 Expanded(child: _chatList()),
                 if (_listening) _voiceIndicator(),
@@ -243,6 +324,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _quickGuideBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 12),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          key: const Key('chat_offline_guide'),
+          onPressed: _openQuickGuides,
+          icon: const Icon(Icons.offline_bolt_outlined, size: 20),
+          label: const Text('Panduan Kilat • Tanpa Token AI'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: NexusGuard.emerald,
+            side: const BorderSide(color: NexusGuard.emerald),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
         ),
       ),
     );
@@ -326,14 +427,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
                 Text(
-                  isUser ? 'KAMU' : 'KOMPLEKGUARD AI',
+                  isUser ? 'KAMU' : (msg['offlineGuide'] == true ? 'PANDUAN OFFLINE' : 'KOMPLEKGUARD AI'),
                   style: NexusGuard.mono(
                     size: 11,
                     color: isUser ? NexusGuard.cyan : NexusGuard.purple,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                SafetyResponseText(
                   msg['message']?.toString() ?? '',
                   style: NexusGuard.rajdhani(
                     size: 16,
