@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../widgets/safety_response_text.dart';
+
 import '../../core/theme/nexus_guard_theme.dart';
 import '../../services/alert_service.dart';
 import '../../services/auth_service.dart';
@@ -791,7 +793,7 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _sectionTitle('Analisis AI', Icons.smart_toy_outlined),
           const SizedBox(height: 10),
-          Text(
+          SafetyResponseText(
               _value(summary,
                   fallback: 'Analisis AI belum tersedia untuk laporan ini.'),
               style: _text()),
@@ -804,7 +806,7 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _sectionTitle('Saran Tindakan', Icons.verified_user_outlined),
           const SizedBox(height: 10),
-          Text(
+          SafetyResponseText(
               _value(_latestAi?['recommendedAction'],
                   fallback: 'Saran tindakan AI belum tersedia.'),
               style: _text()),
