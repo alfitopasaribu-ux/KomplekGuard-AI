@@ -833,7 +833,7 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
                   initialValue: _selectedCategoryId,
                   isExpanded: true,
                   decoration: _fieldDecoration(
-                    label: 'Kategori bahaya *',
+                    label: 'Kategori bahaya',
                     icon: Icons.category_outlined,
                   ),
                   items: _categories.map<DropdownMenuItem<String>>((category) {
@@ -873,7 +873,7 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
                     enabled: !_locked,
                     maxLength: 100,
                     decoration:
-                        _fieldDecoration(label: 'Jenis kejadian lainnya *'),
+                        _fieldDecoration(label: 'Jenis kejadian lainnya'),
                     validator: (value) => value == null || value.trim().isEmpty
                         ? 'Isi jenis kejadian lainnya.'
                         : null,
@@ -888,7 +888,7 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
                   textCapitalization: TextCapitalization.sentences,
                   textInputAction: TextInputAction.next,
                   decoration: _fieldDecoration(
-                    label: 'Judul laporan *',
+                    label: 'Judul laporan',
                     icon: Icons.title_rounded,
                   ).copyWith(hintText: 'Contoh: Pohon tumbang di depan rumah'),
                   validator: (value) => value == null || value.trim().isEmpty
@@ -905,7 +905,7 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
                   maxLength: 1500,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: _fieldDecoration(
-                    label: 'Deskripsi kejadian *',
+                    label: 'Deskripsi kejadian',
                     icon: Icons.notes_rounded,
                   ).copyWith(
                     hintText:
@@ -1063,7 +1063,7 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Foto Kejadian (Opsional)',
+          'Foto Kejadian',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w800,
