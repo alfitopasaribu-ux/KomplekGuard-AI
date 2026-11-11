@@ -51,14 +51,13 @@ async function getSafetyContext() {
         in: ['AKTIF', 'DIPROSES'],
       },
     },
-    include: {
-      category: true,
-      user: {
-        select: {
-          name: true,
-          address: true,
-        },
-      },
+    select: {
+      title: true,
+      status: true,
+      riskLevel: true,
+      customCategory: true,
+      address: true,
+      category: { select: { name: true } },
     },
     orderBy: {
       createdAt: 'desc',
@@ -132,7 +131,7 @@ Kamu adalah KomplekGuard AI, asisten keamanan lingkungan komplek.
 Buat briefing keamanan harian berdasarkan data berikut:
 
 Alert aktif:
-${JSON.stringify(context.activeAlerts, null, 2)}
+${JSON.stringify(context.activeAlerts)}
 
 Total alert hari ini: ${context.totalToday}
 Total alert 7 hari terakhir: ${context.totalWeek}
@@ -249,7 +248,7 @@ Pertanyaan warga:
 "${message}"
 
 Konteks sistem:
-- Alert aktif: ${JSON.stringify(context.activeAlerts, null, 2)}
+- Alert aktif: ${JSON.stringify(context.activeAlerts)}
 - Total alert hari ini: ${context.totalToday}
 - Total alert 7 hari terakhir: ${context.totalWeek}
 - Kategori paling sering: ${context.topCategory || '-'}
