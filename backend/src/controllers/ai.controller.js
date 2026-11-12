@@ -17,11 +17,36 @@ PENTING:
 const fullAnalysis = async (req, res) => {
   try {
     const { alertId, category, customCategory, description } = req.body;
-    const categoryName = customCategory || category || 'Tidak diketahui';
+    if (typeof alertId !== 'string' || !alertId.trim()) {
+      return sendError(res, 'ID laporan wajib diisi untuk analisis.', 400);
+    }
+    const alert = await prisma.alert.findUnique({
+      where: { id: alertId },
+      select: { id: true, userId: true, categoryId: true, customCategory: true,
+        description: true, aiSummary: true, riskLevel: true,
+        category: { select: { name: true } } },
+    });
+    if (!alert) return sendError(res, 'Laporan tidak ditemukan.', 404);
+    if (alert.userId !== req.user.id) {
+      return sendError(res, 'Hanya pelapor dapat meminta analisis AI untuk laporan ini.', 403);
+    }
+    // Existing analysis is reused; repeat taps do not consume more Groq tokens.
+    if (alert.aiSummary && alert.riskLevel) {
+      const existing = await prisma.aIIncidentSummary.findFirst({
+        where: { alertId }, orderBy: { createdAt: 'desc' },
+        select: { recommendedAction: true },
+      });
+      return sendSuccess(res, 'Analisis AI telah tersedia (cache).', {
+        summary: alert.aiSummary, riskLevel: alert.riskLevel,
+        recommendedAction: existing?.recommendedAction || 'Ikuti arahan petugas resmi.',
+        fromCache: true,
+      });
+    }
+    const categoryName = alert.customCategory || alert.category?.name || 'Tidak diketahui';
 
     const userMessage = `
 Jenis Alert: ${categoryName}
-Deskripsi: ${description}
+Deskripsi: ${alert.description.slice(0, 1500)}
 
 Berikan respons dalam format JSON berikut (hanya JSON, tanpa teks lain):
 {
