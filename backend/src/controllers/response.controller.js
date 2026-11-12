@@ -1,7 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient();
-const { isSensitiveAlert, STAFF_ROLES } = require('../utils/guardianVerify');
+const { isSensitiveAlert, STAFF_ROLES, findVerificationMap, verificationFor } = require('../utils/guardianVerify');
 
 function getUserId(req) {
   return req.user?.id || req.user?.userId || req.userId;
@@ -115,8 +115,10 @@ exports.getAlertResponses = async (req, res) => {
         category: { select: { name: true } } },
     });
     if (!incident) return failed(res, "Alert tidak ditemukan.", 404);
-    const isPrivate = isSensitiveAlert(incident) && incident.userId !== req.user.id
-      && !STAFF_ROLES.has(req.user.role);
+    const verificationMap = await findVerificationMap(prisma, [id]);
+    const verification = verificationFor(id, verificationMap);
+    const isPrivate = (isSensitiveAlert(incident) || verification.status !== 'TERVERIFIKASI')
+      && incident.userId !== req.user.id && !STAFF_ROLES.has(req.user.role);
     const responses = await prisma.alertResponse.findMany({
       where: {
         alertId: id,
