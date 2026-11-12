@@ -517,6 +517,13 @@ class _MapScreenState extends State<MapScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: _text(15, weight: FontWeight.w800)),
                         const SizedBox(height: 4),
+                        Text(incident.verificationStatus,
+                            style: _text(11, color: NexusGuard.amber,
+                                weight: FontWeight.w700)),
+                        if (incident.approximate)
+                          Text('Titik peta adalah perkiraan, bukan lokasi tepat.',
+                            style: _text(10, color: NexusGuard.muted)),
+                        const SizedBox(height: 4),
                         Text(incident.address,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -651,6 +658,14 @@ class _MapIncident {
   String get title => data['title']?.toString().trim().isNotEmpty == true
       ? data['title'].toString()
       : 'Laporan warga';
+
+  bool get approximate => data['locationApproximate'] == true;
+  String get verificationStatus => switch (data['verificationStatus']) {
+    'TERVERIFIKASI' => 'Terverifikasi petugas',
+    'PERLU_PEMERIKSAAN' => 'Perlu pemeriksaan',
+    'DITOLAK' => 'Verifikasi ditolak',
+    _ => 'Belum terverifikasi',
+  };
 
   String get address => data['address']?.toString().trim().isNotEmpty == true
       ? data['address'].toString()
