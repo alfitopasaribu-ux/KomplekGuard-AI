@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient();
+const { isSensitiveAlert, STAFF_ROLES } = require('../utils/guardianVerify');
 
 function getUserId(req) {
   return req.user?.id || req.user?.userId || req.userId;
@@ -108,8 +109,14 @@ exports.getAlertResponses = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const incident = await prisma.alert.findUnique({ where: { id }, select: { id: true } });
+    const incident = await prisma.alert.findUnique({
+      where: { id },
+      select: { id: true, userId: true, title: true, description: true, customCategory: true,
+        category: { select: { name: true } } },
+    });
     if (!incident) return failed(res, "Alert tidak ditemukan.", 404);
+    const isPrivate = isSensitiveAlert(incident) && incident.userId !== req.user.id
+      && !STAFF_ROLES.has(req.user.role);
     const responses = await prisma.alertResponse.findMany({
       where: {
         alertId: id,
@@ -130,7 +137,7 @@ exports.getAlertResponses = async (req, res) => {
 
     return success(res, "Daftar respons berhasil diambil.", responses.map(r => ({
       id: r.id, alertId: r.alertId, userId: r.userId,
-      responseStatus: r.responseStatus, note: r.note,
+      responseStatus: r.responseStatus, note: isPrivate ? null : r.note,
       createdAt: r.createdAt, user: r.user,
     })));
   } catch (error) {
