@@ -70,7 +70,7 @@ function residentAlertView(alert, viewer, verification) {
     if (Array.isArray(detail.responses)) {
       detail.responses = detail.responses.map(r => ({
         id: r.id, userId: r.userId, responseStatus: r.responseStatus,
-        note: r.note, createdAt: r.createdAt,
+        note: sensitive ? null : r.note, createdAt: r.createdAt,
         user: r.user ? { id: r.user.id, name: r.user.name, role: r.user.role } : null,
       }));
     }
@@ -78,7 +78,7 @@ function residentAlertView(alert, viewer, verification) {
       detail.aiSummaries = detail.aiSummaries.map(({ rawAiResponse, ...rest }) => rest);
     }
     if (approximate) {
-      const decimals = sensitive ? 2 : 3;
+      const decimals = 2; // Coarse area on all unverified or sensitive reports.
       detail.latitude = Number(alert.latitude.toFixed(decimals));
       detail.longitude = Number(alert.longitude.toFixed(decimals));
       detail.address = 'Area perkiraan' +
