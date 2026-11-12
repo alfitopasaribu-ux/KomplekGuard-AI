@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/nexus_guard_theme.dart';
+import '../../widgets/guardian_verification_badge.dart';
 import '../../services/alert_service.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
@@ -663,6 +664,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: _text(
                             size: 14, weight: FontWeight.w700, height: 1.35)),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GuardianVerificationBadge(
+                        alert['verificationStatus']?.toString(),
+                        compact: true,
+                      ),
+                    ),
                     const SizedBox(height: 5),
                     Text(_categoryName(alert),
                         maxLines: 1,
