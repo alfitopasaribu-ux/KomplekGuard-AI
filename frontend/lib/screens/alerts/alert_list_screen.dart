@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/nexus_guard_theme.dart';
+import '../../widgets/guardian_verification_badge.dart';
 
 import '../../services/alert_service.dart';
 import 'alert_detail_screen.dart';
@@ -111,10 +112,21 @@ class _AlertListScreenState extends State<AlertListScreen>
                 color: NexusGuard.red,
               ),
               title: Text(alert['title']?.toString() ?? ''),
-              subtitle: Text(
-                alert['description']?.toString() ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 4),
+                  Text(
+                    alert['description']?.toString() ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  GuardianVerificationBadge(
+                    alert['verificationStatus']?.toString(), compact: true,
+                  ),
+                ],
               ),
               trailing: Chip(
                 label: Text(
