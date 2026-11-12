@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const { sendSuccess, sendError } = require('../utils/response');
+const { findVerificationMap, verificationFor, residentAlertView, reviewIndicators } = require('../utils/guardianVerify');
 
 function isOwner(req, alert) {
   return alert.userId === req.user.id;
@@ -88,7 +89,8 @@ const getAlerts = async (req, res) => {
       },
     });
 
-    return sendSuccess(res, 'Daftar alert', alerts);
+    const checks = await findVerificationMap(prisma, alerts.map(a => a.id));
+    return sendSuccess(res, 'Daftar alert', alerts.map(a => residentAlertView(a, req.user, verificationFor(a.id, checks))));
   } catch (e) {
     return sendError(res, e.message, 500);
   }
@@ -108,7 +110,8 @@ const getActiveAlerts = async (req, res) => {
       },
     });
 
-    return sendSuccess(res, 'Alert aktif', alerts);
+    const checks = await findVerificationMap(prisma, alerts.map(a => a.id));
+    return sendSuccess(res, 'Alert aktif', alerts.map(a => residentAlertView(a, req.user, verificationFor(a.id, checks))));
   } catch (e) {
     return sendError(res, e.message, 500);
   }
@@ -128,7 +131,8 @@ const getAlertHistory = async (req, res) => {
       },
     });
 
-    return sendSuccess(res, 'Riwayat alert', alerts);
+    const checks = await findVerificationMap(prisma, alerts.map(a => a.id));
+    return sendSuccess(res, 'Riwayat alert', alerts.map(a => residentAlertView(a, req.user, verificationFor(a.id, checks))));
   } catch (e) {
     return sendError(res, e.message, 500);
   }
@@ -198,7 +202,10 @@ const createAlert = async (req, res) => {
       },
     });
 
-    return sendSuccess(res, 'Alert berhasil dibuat', alert, 201);
+    return sendSuccess(res, 'Alert berhasil dibuat', {
+      ...alert, verificationStatus: 'BELUM_DIVERIFIKASI',
+      verifiedAt: null, locationApproximate: false,
+    }, 201);
   } catch (e) {
     return sendError(res, e.message, 500);
   }
@@ -217,7 +224,8 @@ const getAlertById = async (req, res) => {
       return sendError(res, 'Alert tidak ditemukan', 404);
     }
 
-    return sendSuccess(res, 'Detail alert', alert);
+    const checks = await findVerificationMap(prisma, [alert.id]);
+    return sendSuccess(res, 'Detail alert', residentAlertView(alert, req.user, verificationFor(alert.id, checks)));
   } catch (e) {
     return sendError(res, e.message, 500);
   }
@@ -283,7 +291,8 @@ const updateAlertStatus = async (req, res) => {
       },
     });
 
-    return sendSuccess(res, 'Status alert berhasil diperbarui', updated);
+    const checks = await findVerificationMap(prisma, [updated.id]);
+    return sendSuccess(res, 'Status alert berhasil diperbarui', residentAlertView(updated, req.user, verificationFor(updated.id, checks)));
   } catch (e) {
     return sendError(res, e.message, 500);
   }
