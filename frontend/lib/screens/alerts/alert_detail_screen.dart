@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../widgets/safety_response_text.dart';
+import '../../widgets/guardian_verification_badge.dart';
 
 import '../../core/theme/nexus_guard_theme.dart';
 import '../../services/alert_service.dart';
@@ -748,6 +749,17 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
         _chip('Risiko: ${_riskLabel(_risk)}', _riskColor(_risk),
             icon: Icons.shield_outlined),
       ]),
+      const SizedBox(height: 12),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: GuardianVerificationBadge(alert['verificationStatus']?.toString()),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        'Status ini menunjukkan pemeriksaan petugas, bukan keputusan otomatis AI. '
+        'Jangan mendatangi lokasi berisiko sendirian.',
+        style: _text(size: 11, color: NexusGuard.muted),
+      ),
       const SizedBox(height: 14),
       Text(_value(alert['description'], fallback: 'Deskripsi belum tersedia.'),
           style: _text(color: NexusGuard.muted)),
@@ -814,6 +826,7 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
       );
 
   Widget _locationCard(Map<String, dynamic> alert) {
+    final approximate = alert['locationApproximate'] == true;
     final validCoordinates =
         _coordinate(alert['latitude'], latitude: true) != null &&
             _coordinate(alert['longitude'], latitude: false) != null;
@@ -844,12 +857,18 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
                       style: _text(size: 12)),
                   const SizedBox(height: 5),
                   Text(
-                      validCoordinates
-                          ? '${alert['latitude']}, ${alert['longitude']}'
-                          : 'Koordinat belum tersedia',
+                      approximate
+                          ? 'Lokasi perkiraan • bukan titik GPS tepat. '
+                            'Jangan gunakan untuk menuju lokasi tanpa koordinasi.'
+                          : validCoordinates
+                              ? '${alert['latitude']}, ${alert['longitude']}'
+                              : 'Koordinat belum tersedia',
                       style: _text(size: 11, color: NexusGuard.muted)),
                 ])),
-            if (validCoordinates)
+            if (approximate)
+              const Icon(Icons.info_outline_rounded,
+                  color: NexusGuard.amber)
+            else if (validCoordinates)
               const Icon(Icons.chevron_right_rounded,
                   color: NexusGuard.emerald),
           ]),
@@ -880,7 +899,8 @@ class _AlertDetailScreenState extends State<AlertDetailScreen> {
       _sectionTitle('Respons Anda', Icons.volunteer_activism_outlined),
       const SizedBox(height: 10),
       Text(
-          'Beri tahu pelapor bila Anda dapat membantu. Perubahan status Anda ditambahkan ke riwayat respons.',
+          'Beri tahu pelapor bila Anda dapat membantu. Jangan datang sendiri ke '
+          'lokasi yang belum diverifikasi; koordinasikan terlebih dahulu dengan petugas.',
           style: _text(size: 12, color: NexusGuard.muted)),
       if (latest != null)
         Padding(
