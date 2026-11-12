@@ -37,9 +37,7 @@ exports.respondToAlert = async (req, res) => {
 
     const alert = await prisma.alert.findUnique({
       where: { id },
-      include: {
-        user: true,
-      },
+      select: { id: true, userId: true, title: true },
     });
 
     if (!alert) {
@@ -64,12 +62,9 @@ exports.respondToAlert = async (req, res) => {
           select: {
             id: true,
             name: true,
-            phone: true,
             role: true,
-            address: true,
           },
         },
-        alert: true,
       },
     });
 
@@ -95,7 +90,15 @@ exports.respondToAlert = async (req, res) => {
       },
     });
 
-    return success(res, "Respons berhasil dikirim.", response);
+    return success(res, "Respons berhasil dikirim.", {
+      id: response.id,
+      alertId: response.alertId,
+      userId: response.userId,
+      responseStatus: response.responseStatus,
+      note: response.note,
+      createdAt: response.createdAt,
+      user: response.user,
+    });
   } catch (error) {
     return failed(res, error.message);
   }
@@ -105,6 +108,8 @@ exports.getAlertResponses = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const incident = await prisma.alert.findUnique({ where: { id }, select: { id: true } });
+    if (!incident) return failed(res, "Alert tidak ditemukan.", 404);
     const responses = await prisma.alertResponse.findMany({
       where: {
         alertId: id,
@@ -117,15 +122,17 @@ exports.getAlertResponses = async (req, res) => {
           select: {
             id: true,
             name: true,
-            phone: true,
             role: true,
-            address: true,
           },
         },
       },
     });
 
-    return success(res, "Daftar respons berhasil diambil.", responses);
+    return success(res, "Daftar respons berhasil diambil.", responses.map(r => ({
+      id: r.id, alertId: r.alertId, userId: r.userId,
+      responseStatus: r.responseStatus, note: r.note,
+      createdAt: r.createdAt, user: r.user,
+    })));
   } catch (error) {
     return failed(res, error.message);
   }
